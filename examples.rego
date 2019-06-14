@@ -1,9 +1,23 @@
-package examples
+ package examples
 
 is_a_person[person] { data.people[_] = person }
 is_a_team[team] { data.teams[_] = team }
 is_a_role[role] { data.roles[_] = role }
 is_a_repo[repo] { data.repos[_] = repo }
+is_a_service[service] { data.services[_] = service }
+is_a_data_classification[data_classification] { data.data_classifications[_] = data_classification }
+is_a_kubernetes_pod[kubernetes_pod] { data.kubernetes_pods[_] = kubernetes_pod }
+is_a_aws_s3_bucket[aws_s3_bucket] { data.aws_s3_buckets[_] = aws_s3_bucket }
+
+is_a_asset[asset] {
+  data.assets[_] = asset
+} {
+  is_a_service[asset]
+} {
+  is_a_kubernetes_pod[asset]
+} {
+  is_a_aws_s3_bucket[asset]
+}
 
 works_as_a[[person, role]] {
   role := data.works_as_a[person][_]
@@ -60,21 +74,6 @@ has_read_access_to[[person, repo]] {
 
   is_a_person[person]
   is_a_repo[repo]
-}
-
-
-
-is_a_service[service] { data.services[_] = service }
-is_a_data_classification[data_classification] { data.data_classifications[_] = data_classification }
-is_a_kubernetes_pod[kubernetes_pod] { data.kubernetes_pods[_] = kubernetes_pod }
-is_a_aws_s3_bucket[aws_s3_bucket] { data.aws_s3_buckets[_] = aws_s3_bucket }
-
-is_a_asset[asset] {
-  is_a_service[asset]
-} {
-  is_a_kubernetes_pod[asset]
-} {
-  is_a_aws_s3_bucket[asset]
 }
 
 is_classified_as[[asset, classification]] {

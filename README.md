@@ -21,3 +21,19 @@ Some wants for the system:
     there has been verification in the upstream system
   - Audit log of all changes to the system
   - Event subscriptions for changes in entites for outside agents to act on
+
+## Labeling
+
+### Kubernetes labeling example
+
+```
+cloud.rvu.ontology/is_part_of: /rvu/mortgages/page-speed
+cloud.rvu.ontology/is_part_of: /rvu/mortgages/bankrate/front-end
+```
+
+### Github labeling example
+
+```
+tags:
+  cloud.rvu.ontology/is_part_of: /rvu/platform/airship/logging
+```

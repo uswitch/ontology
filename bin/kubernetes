@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+
+require 'k8s-client'
+
+client = K8s::Client.autoconfig
+
+client.api_groups.each { |api|
+
+  api_client = client.api(api)
+
+  api_client.api_resources.each { |resource_client|
+    api_client.resource(resource_client.name).list.each { |resource|
+      puts JSON.dump(resource)
+    }
+  }
+
+}

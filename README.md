@@ -22,18 +22,28 @@ Some wants for the system:
   - Audit log of all changes to the system
   - Event subscriptions for changes in entites for outside agents to act on
 
+## Structure
+
+This repo will act both as the store for slowly changing entities, as well as containing the code
+for aggregating entities from other systems.
+
 ## Labeling
+
+We use labels/tags on entities defined outside of this repository in order to describe
+relations.
+
+These will
 
 ### Kubernetes labeling example
 
 ```
-cloud.rvu.ontology/is_part_of: /rvu/mortgages/page-speed
-cloud.rvu.ontology/is_part_of: /rvu/mortgages/bankrate/front-end
+cloud.rvu.ontology/relation/v1/is_part_of: /rvu/mortgages/page-speed
+cloud.rvu.ontology/relation/v1/is_part_of: /rvu/mortgages/bankrate/front-end
 ```
 
 ### Github labeling example
 
 ```
 tags:
-  cloud.rvu.ontology/is_part_of: /rvu/platform/airship/logging
+  cloud.rvu.ontology/relation/v1/is_part_of: /rvu/platform/airship/logging
 ```

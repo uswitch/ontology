@@ -1,5 +1,3 @@
-#!/usr/bin/env ruby
-
 require 'httparty'
 
 #puts response.body, response.code, response.message, response.headers.inspect
@@ -20,6 +18,19 @@ class DockerRegistry
   include HTTParty
 
   base_uri "https://registry.usw.co"
+
+  def sync
+    registry.repositories.map { |repo|
+      registry.tags(repo).map { |tag|
+        manifest = registry.manifest(repo, tag)
+        {
+          name: "#{repo}:#{tag}",
+          created: registry.created_from(manifest),
+          labels: registry.labels_from(manifest),
+        }
+      }
+    }.flatten
+  end
 
   def repositories
     list('/v2/_catalog', 'repositories')
@@ -89,14 +100,3 @@ class DockerRegistry
   end
 
 end
-
-registry = DockerRegistry.new
-
-registry.repositories.each { |repo|
-  registry.tags(repo).each { |tag|
-    manifest = registry.manifest(repo, tag)
-    puts "#{repo}:#{tag}"
-    puts registry.created_from(manifest)
-    puts registry.labels_from(manifest)
-  }
-}

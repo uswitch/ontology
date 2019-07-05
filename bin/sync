@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+
+require "parallel"
+
+require_relative "../lib/ad.rb"
+require_relative "../lib/aws.rb"
+require_relative "../lib/docker.rb"
+require_relative "../lib/gcp.rb"
+require_relative "../lib/github.rb"
+require_relative "../lib/kubernetes.rb"
+
+sources = [
+#  AD.new,
+#  AWS.new,
+#  DockerRegistry.new,
+#  GCP.new,
+  GitHub.new,
+#  Kubernetes.new,
+]
+
+Parallel.each(sources) { |source|
+  puts source.sync
+}

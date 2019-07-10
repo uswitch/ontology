@@ -19,5 +19,14 @@ sources = [
 ]
 
 Parallel.each(sources) { |source|
-  puts source.sync
+  entities_to_store = source.sync
+
+  entities_to_store.each { |e|
+    file = "./external#{e[:path]}"
+    dir = File.dirname(file)
+
+    FileUtils.mkdir_p(dir)
+
+    File.write(file, JSON.dump(e[:entity]))
+  }
 }

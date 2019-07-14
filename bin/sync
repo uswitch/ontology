@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+require "digest"
 require "parallel"
 
 require_relative "../lib/ad.rb"
@@ -22,11 +23,20 @@ Parallel.each(sources) { |source|
   entities_to_store = source.sync
 
   entities_to_store.each { |e|
-    file = "./external#{e[:path]}"
+    file = "./external#{e[:path]}.json"
     dir = File.dirname(file)
 
     FileUtils.mkdir_p(dir)
 
-    File.write(file, JSON.dump(e[:entity]))
+    File.write(file, JSON.pretty_generate(e[:entity]))
+
+    e[:relations].each { |relation|
+      relation_json = JSON.pretty_generate(relation)
+
+      hash = Digest::SHA2.hexdigest relation_json
+      file = file = "./external#{e[:path]}/#{hash}.json"
+
+      File.write(file, relation_json)
+    }
   }
 }

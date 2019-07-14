@@ -12,10 +12,10 @@ require_relative "../lib/kubernetes.rb"
 
 sources = [
 #  AD.new,
-#  AWS.new,
+  AWS.new,
 #  DockerRegistry.new,
 #  GCP.new,
-  GitHub.new,
+#  GitHub.new,
 #  Kubernetes.new,
 ]
 
@@ -30,13 +30,34 @@ Parallel.each(sources) { |source|
 
     File.write(file, JSON.pretty_generate(e[:entity]))
 
-    e[:relations].each { |relation|
-      relation_json = JSON.pretty_generate(relation)
+    if e.has_key?(:symlinks) && e[:symlinks].count > 0
+      full_path = File.expand_path(file)
 
-      hash = Digest::SHA2.hexdigest relation_json
-      file = file = "./external#{e[:path]}/#{hash}.json"
+      e[:symlinks].each { |symlink|
+        symlink_path = "./external#{symlink}.json"
+        symlink_dir = File.dirname(symlink_path)
 
-      File.write(file, relation_json)
-    }
+        FileUtils.mkdir_p(symlink_dir)
+
+        if File.symlink?(symlink_path)
+          File.delete(symlink_path)
+        end
+
+        File.symlink(full_path, symlink_path)
+      }
+    end
+
+    if e.has_key?(:relations) && e[:relations].count > 0
+      FileUtils.mkdir_p("./external#{e[:path]}")
+
+      e[:relations].each { |relation|
+        relation_json = JSON.pretty_generate(relation)
+
+        hash = Digest::SHA2.hexdigest relation_json
+        file = file = "./external#{e[:path]}/#{hash}.json"
+
+        File.write(file, relation_json)
+      }
+    end
   }
 }

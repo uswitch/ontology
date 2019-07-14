@@ -26,7 +26,7 @@ class GitHub
 
       if repo_h.has_key?(:metadata) and repo_h[:metadata].has_key?(:tags)
         repo_h[:metadata][:tags].each { |tag, val|
-          return if not tag.starts_with TAG_PREFIX
+          next if not tag.start_with? TAG_PREFIX
 
           type = tag[TAG_PREFIX.length..-1]
           relations.push(
@@ -35,22 +35,20 @@ class GitHub
                 type: type,
               },
               properties: {
-                other: val
+                a: "/repository/github.com/#{repo.full_name}",
+                b: val,
               },
             }
           )
         }
-
-        puts relations
       end
 
       {
-        path: "/repository/github.com/#{repo.full_name}.json",
+        path: "/repository/github.com/#{repo.full_name}",
         entity: {
           metadata: {
             type: "/entities/v1/repository",
           },
-          relations: relations,
           properties: {
             language: repo[:language],
             license: repo.has_key?(:license) ? repo[:license][:key] : nil,
@@ -59,6 +57,7 @@ class GitHub
             pushed_at: repo[:pushed_at],
           },
         },
+        relations: relations,
       }
     }
   end

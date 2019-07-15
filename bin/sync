@@ -2,6 +2,7 @@
 
 require "digest"
 require "parallel"
+require "ruby-progressbar"
 
 require_relative "../lib/ad.rb"
 require_relative "../lib/aws.rb"
@@ -12,8 +13,8 @@ require_relative "../lib/kubernetes.rb"
 
 sources = [
 #  AD.new,
-  AWS.new,
-#  DockerRegistry.new,
+#  AWS.new,
+  DockerRegistry.new,
 #  GCP.new,
 #  GitHub.new,
 #  Kubernetes.new,
@@ -23,6 +24,8 @@ Parallel.each(sources) { |source|
   entities_to_store = source.sync
 
   entities_to_store.each { |e|
+    next if not e.has_key?(:path)
+
     file = "./external#{e[:path]}.json"
     dir = File.dirname(file)
 

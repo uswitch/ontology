@@ -27,6 +27,11 @@ Some wants for the system:
 This repo will act both as the store for slowly changing entities, as well as containing the code
 for aggregating entities from other systems.
 
+We can see these different types of entities/relations as being internal and external to ontology.
+We will store all the internal (slowly changing) entities in `./internal/...` and the external (
+dynamicly changing) entities in `./external/...`. The former will be managed by humans changing
+them via pull requests to this repo, and the later loaded in via `./bin/sync`.
+
 ## Labeling
 
 We use labels/tags on entities defined outside of this repository in order to describe

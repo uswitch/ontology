@@ -6,18 +6,18 @@
     "relations": [
         {
             "metadata": {
-                "type": "/relations/v1/is_part_of",
+                "type": "/relations/v1/is_part_of"
             },
             "properties": {
-                "other": "/rvu/airship",
+                "other": "/rvu/airship"
             }
         },
         {
             "metadata": {
-                "type": "/relations/v1/is_classified_as",
+                "type": "/relations/v1/is_classified_as"
             },
             "properties": {
-                "other": "/classifications/restrictied",
+                "other": "/classifications/restrictied"
             }
         }
     ]

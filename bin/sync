@@ -4,12 +4,12 @@ require "digest"
 require "parallel"
 require "ruby-progressbar"
 
-require_relative "../lib/ad.rb"
-require_relative "../lib/aws.rb"
-require_relative "../lib/docker.rb"
-require_relative "../lib/gcp.rb"
-require_relative "../lib/github.rb"
-require_relative "../lib/kubernetes.rb"
+require_relative "../lib/external/ad.rb"
+require_relative "../lib/external/aws.rb"
+require_relative "../lib/external/docker.rb"
+require_relative "../lib/external/gcp.rb"
+require_relative "../lib/external/github.rb"
+require_relative "../lib/external/kubernetes.rb"
 
 sources = [
 #  AD.new,

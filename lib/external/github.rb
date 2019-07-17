@@ -47,7 +47,7 @@ class GitHub
         path: "/repository/github.com/#{repo.full_name}",
         entity: {
           metadata: {
-            type: "/entities/v1/repository",
+            type: "/entity/v1/repository",
           },
           properties: {
             language: repo[:language],

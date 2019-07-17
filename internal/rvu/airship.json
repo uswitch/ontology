@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "type": "/entities/v1/team"
+        "type": "/entity/v1/team"
     },
     "relations": [
         {
             "metadata": {
-                "type": "/relations/v1/is_part_of"
+                "type": "/relation/v1/is_part_of"
             },
             "properties": {
                 "other": "/rvu"

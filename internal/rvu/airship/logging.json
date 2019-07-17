@@ -1,12 +1,12 @@
 {
     "metadata": {
-        "type": "/entities/v1/service",
+        "type": "/entity/v1/service",
         "name": "logging"
     },
     "relations": [
         {
             "metadata": {
-                "type": "/relations/v1/is_part_of"
+                "type": "/relation/v1/is_part_of"
             },
             "properties": {
                 "other": "/rvu/airship"
@@ -14,10 +14,10 @@
         },
         {
             "metadata": {
-                "type": "/relations/v1/is_classified_as"
+                "type": "/relation/v1/is_classified_as"
             },
             "properties": {
-                "other": "/classifications/restrictied"
+                "other": "/classification/restrictied"
             }
         }
     ]

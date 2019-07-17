@@ -50,7 +50,7 @@ def eip_entity(resource)
     path: path,
     entity: {
       metadata: {
-        type: "/entities/v1/ip_v4_address",
+        type: "/entity/v1/ip_v4_address",
       },
       properties: {
         provider: "aws",
@@ -70,7 +70,7 @@ def instance_entity(resource)
     path: path,
     entity: {
       metadata: {
-        type: "/entities/v1/computer",
+        type: "/entity/v1/computer",
       },
       properties: {
         provider: "aws",
@@ -244,7 +244,7 @@ def eni_entity(resource)
     symlinks: symlinks,
     entity: {
       metadata: {
-        type: "/entities/v1/network_interface",
+        type: "/entity/v1/network_interface",
       },
       properties: {
         provider: "aws",
@@ -261,7 +261,7 @@ def nat_entity(resource)
     path: path,
     entity: {
       metadata: {
-        type: "/entities/v1/computer",
+        type: "/entity/v1/computer",
       },
       properties: {
         provider: "aws",
@@ -295,7 +295,7 @@ def lb_entity(resource)
     path: path,
     entity: {
       metadata: {
-        type: "/entities/v1/load_balancer",
+        type: "/entity/v1/load_balancer",
       },
       properties: {
         provider: "aws",
@@ -330,7 +330,7 @@ def rds_instance_entity(resource)
     path: path,
     entity: {
       metadata: {
-        type: "/entities/v1/computer",
+        type: "/entity/v1/computer",
       },
       properties: {
         provider: "aws",
@@ -348,7 +348,7 @@ def lambda_entity(resource)
     path: path,
     entity: {
       metadata: {
-        type: "/entities/v1/computer",
+        type: "/entity/v1/computer",
       },
       properties: {
         provider: "aws",

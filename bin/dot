@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 
 require 'digest'
-require 'json'
-require 'parallel'
 require 'set'
+
+require_relative "../lib/store.rb"
 
 if not ARGV.count > 1
   $stderr.puts "dot path... root"
@@ -11,138 +11,18 @@ end
 
 root_id = ARGV[-1]
 directories = ARGV[0..-2]
-file_glob = File.join("**", "*.{json}")
 
-all_files = directories.map { |directory|
-
-  base = File.expand_path(directory)
-
-  if not File.directory? base
-    $stderr.puts "#{base} is not a directory"
-    next
-  end
-
-  Parallel.map(Dir.glob(file_glob, base: base), progress: {title: "Loading files from #{directory}", output: $stderr}) { |file|
-    path = File.join(base, file)
-    id = "/#{File.dirname(file)}/#{File.basename(file, ".*")}"
-
-    if File.symlink?(path)
-      link = File.readlink(path)
-      if not link.start_with?(base)
-        $stderr.puts "Link doesn't share a common base with entity: #{path} #{link}"
-        next
-      end
-
-      link_file = link[base.length..-1]
-      link_id = "/#{File.dirname(link_file)}/#{File.basename(link_file, ".*")}"
-
-      {
-        "metadata" => {
-          "type" => "/link",
-          "id" => id,
-        },
-        "properties" => {
-          "link" => link_id,
-        },
-      }
-    else
-      parsed = JSON.parse(File.read(path))
-
-      if not parsed["metadata"].has_key?("id")
-        parsed["metadata"]["id"] = id
-      end
-
-      parsed
-    end
-  }
-}.flatten
-
-relations = []
-entities = []
-entities_by_id = {}
-relations_by_id = {}
-relations_by_entity_id = Hash.new { |h, k| h[k] = [] }
-
-progressbar = ProgressBar.create(title: "Partitioning files", total: all_files.count, output: $stderr)
-
-all_files.each { |file|
-  id = file["metadata"]["id"]
-  type = file["metadata"]["type"]
-
-  if type.start_with?("/entities")
-    $stderr.puts "Overwriting id #{id}" if entities_by_id.has_key?(id)
-
-    entities << file
-    entities_by_id[id] = file
-  elsif type.start_with?("/relation")
-    relations << file
-    relations_by_id[file["metadata"]["id"]] = file
-    relations_by_entity_id[file["properties"]["a"]] << file
-    relations_by_entity_id[file["properties"]["b"]] << file
-  elsif type.start_with?("/link")
-    entities_by_id[id] = file
-  else
-    $stderr.puts "Unknown type: #{type}"
-  end
-
-  progressbar.increment
-}
-
-def all_related_ids(ent_idx, rel_idx, id)
-  seen = Set.new
-  to_traverse = [id]
-
-  begin
-    to_traverse.each { |id| seen.add(id) }
-
-    to_traverse = to_traverse.map { |id|
-      rels_idx[id]
-        .map { |rel| [ rel["properties"]["a"], rel["properties"]["b"] ] }
-        .flatten
-        .reject { |new_id| seen.include?(new_id) }
-    }.flatten
-  end while to_traverse.count > 0
-
-  seen.to_a
-end
-
-def all_relations_for(ent_idx, rel_idx, rel_ent_idx, id)
-  seen = Set.new
-  to_traverse = rel_ent_idx[id]
-
-  begin
-    to_traverse.each { |rel| seen.add(rel) }
-
-    to_traverse = to_traverse.map { |rel|
-      a = rel["properties"]["a"]
-      b = rel["properties"]["b"]
-
-      [rel_ent_idx[a], rel_ent_idx[b]].flatten.compact.reject { |new_rel| seen.include?(new_rel) }
-    }.flatten
-  end while to_traverse.count > 0
-
-  seen.to_a
-end
-
-def resolve(ent_idx, id)
-  e = ent_idx[id]
-  if e and e["metadata"]["type"].start_with? "/link"
-    resolve(idx, e["properties"]["link"])
-  elsif e and e["metadata"]["type"].start_with? "/entities"
-    e
-  else
-    nil
-  end
-end
+store = Store.from_directories(directories, progress: {title: "Loading files", output: $stderr})
 
 def node_id(entity)
   "a#{Digest::SHA1.hexdigest(entity["metadata"]["id"])}"
 end
 
-
-def dot(ent_idx, relations)
-
-  all_pairs = relations.map { |rel| [ resolve(ent_idx, rel["properties"]["a"]), resolve(ent_idx, rel["properties"]["b"]) ] }
+def dot(store, id)
+  all_relations = store.all_relations_for(id)
+  all_pairs = all_relations.map { |rel|
+    [ store.resolve(rel["properties"]["a"]), store.resolve(rel["properties"]["b"]) ]
+  }
   all_entities = all_pairs.flatten.to_set
 
   out = []
@@ -168,6 +48,4 @@ def dot(ent_idx, relations)
   out.join("\n")
 end
 
-all_relations = all_relations_for(entities_by_id, relations_by_id, relations_by_entity_id, root_id)
-
-puts dot(entities_by_id, all_relations)
+puts dot(store, root_id)

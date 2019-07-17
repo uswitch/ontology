@@ -58,7 +58,7 @@ class DockerRegistry
             ],
             entity: {
               metadata: {
-                type: "/entities/v1/container",
+                type: "/entity/v1/container",
               },
               properties: {
                 provider: "docker",

@@ -1,0 +1,9 @@
+{
+    "metadata": {
+        "type": "/type"
+    },
+    "properties": {
+        "parent": "/entity/v1",
+        "spec": {}
+    }
+}

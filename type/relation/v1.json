@@ -1,0 +1,19 @@
+{
+    "metadata": {
+        "type": "/type"
+    },
+    "properties": {
+        "spec": {
+            "a": {
+                "type": "string",
+                "pointer_to": "/entity/v1",
+                "required": true
+            },
+            "b": {
+                "type": "string",
+                "pointer_to": "/entity/v1",
+                "required": true
+            }
+        }
+    }
+}

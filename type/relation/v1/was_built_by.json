@@ -1,0 +1,28 @@
+{
+    "metadata": {
+        "type": "/type"
+    },
+    "properties": {
+        "parent": "/relation/v1",
+        "spec": {
+            "a": {
+                "type": "string",
+                "pointer_to": "/entity/v1/container",
+                "required": true
+            },
+            "b": {
+                "type": "string",
+                "pointer_to": "/entity/v1/repository",
+                "required": true
+            },
+            "ref": {
+                "type": ["string", "null"],
+                "required": true
+            },
+            "at": {
+                "type": "",
+                "required": true
+            }
+        }
+    }
+}

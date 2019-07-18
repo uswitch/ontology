@@ -11,7 +11,7 @@ class Store
   def self.from_directories(directories, progress: nil, validate: true, glob: File.join("**", "*.{json}"))
     store = Store.new
 
-    directories.each { |directory|
+    all_things = directories.map { |directory|
 
       base = File.expand_path(directory)
 
@@ -21,7 +21,12 @@ class Store
 
       files = Dir.glob(glob, base: base)
 
-      Parallel.each(files, in_threads: 10, progress: progress) { |file|
+      if progress
+        parse_progress = progress.clone
+        parse_progress[:title] = "Parsing files from #{base}"
+      end
+
+      Parallel.map(files, in_threads: 10, progress: parse_progress) { |file|
         path = File.join(base, file)
         id = "/#{File.dirname(file)}/#{File.basename(file, ".*")}"
 
@@ -54,14 +59,54 @@ class Store
           end
         end
 
-        # we can't follow pointers until everything is loaded
-        store.add!(parsed, validate: validate, ignore_pointers: true)
+        parsed
       }
+    }.flatten
+
+    all_types = []
+    all_entities = []
+    all_relations = []
+
+    if progress
+      opts = progress.clone
+      opts[:title] = "Loading into store"
+      opts[:total] = all_things.count * 2
+
+      load_progress = ProgressBar.create(**opts)
+    end
+
+    all_things.each { |thing|
+      if thing["metadata"]["type"].start_with? "/entity" or
+        thing["metadata"]["type"].start_with? "/link"
+        all_entities << thing
+      elsif thing["metadata"]["type"].start_with? "/relation"
+        all_relations << thing
+      elsif thing["metadata"]["type"].start_with? "/type"
+        all_types << thing
+      else
+        raise "Unknown type '#{thing["metadata"]["type"]}' for '#{thing["metadata"]["id"]}"
+      end
+
+      load_progress.increment
     }
 
-    invalid_relations = store.relations.reject { |r| store.valid?(r) }.map { |r| r["metadata"]["id"] }
+    all_types.each { |thing|
+      store.add!(thing)
+      load_progress.increment
+    }
+    all_entities.each { |thing|
+      store.add!(thing)
+      load_progress.increment
+    }
+    all_relations.each { |thing|
+      if store.valid?(thing)
+        store.add!(thing, validate: false)
+      else
+        $stderr.puts "Dropping invalid relation: #{thing}'"
+      end
 
-    raise "Invalid relations: #{invalid_relations}" if not invalid_relations.empty?
+      load_progress.increment
+    }
 
     store
   end
@@ -85,11 +130,11 @@ class Store
     @types_by_id = { "/type" => base_type, "/link" => base_type }
   end
 
-  def add!(thing, validate: true, ignore_pointers: false)
+  def add!(thing, validate: true)
     id = thing["metadata"]["id"]
     type = thing["metadata"]["type"]
 
-    raise "Invalid thing: #{thing}" if validate and not valid?(thing, ignore_pointers: ignore_pointers)
+    raise "Invalid thing: #{thing}" if validate and not valid?(thing)
 
     @add_mutex.synchronize {
       if type.start_with?("/entity")

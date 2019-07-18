@@ -12,7 +12,7 @@ end
 root_id = ARGV[-1]
 directories = ARGV[0..-2]
 
-store = Store.from_directories(directories, progress: {title: "Loading files", output: $stderr})
+store = Store.from_directories(directories, progress: {format: '%t |%E | %B | %a', output: $stderr})
 
 def node_id(entity)
   "a#{Digest::SHA1.hexdigest(entity["metadata"]["id"])}"

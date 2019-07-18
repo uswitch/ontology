@@ -1,4 +1,8 @@
 require 'aws-sdk-configservice'
+require 'aws-sdk-ec2'
+require 'aws-sdk-elasticsearchservice'
+require 'aws-sdk-elasticache'
+require 'aws-sdk-efs'
 require 'json'
 require 'resolv'
 
@@ -24,17 +28,7 @@ def eip_entity(resource)
   path = "/ip_v4_address/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{resource["resourceId"]}"
   relations = tag_relations(path, resource)
 
-  if resource["configuration"]["instanceId"]
-    relations << {
-      metadata: {
-        type: "/relation/v1/is_part_of",
-      },
-      properties: {
-        a: path,
-        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{resource["configuration"]["instanceId"]}",
-      },
-    }
-  elsif resource["configuration"]["networkInterfaceId"]
+  if resource["configuration"]["networkInterfaceId"]
     relations << {
       metadata: {
         type: "/relation/v1/is_part_of",
@@ -42,6 +36,16 @@ def eip_entity(resource)
       properties: {
         a: path,
         b: "/network_interface/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{resource["configuration"]["networkInterfaceId"]}",
+      },
+    }
+  elsif resource["configuration"]["instanceId"]
+    relations << {
+      metadata: {
+        type: "/relation/v1/is_part_of",
+      },
+      properties: {
+        a: path,
+        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{resource["configuration"]["instanceId"]}",
       },
     }
   end
@@ -102,23 +106,24 @@ def eni_entity(resource)
   interface_type = resource["configuration"]["interfaceType"]
   requester_id = resource["configuration"]["requesterId"]
 
-  if interface_type == "vpc_endpoint" or
-    (interface_type == "interface" and description.start_with?("VPC Endpoint Interface "))
-    endpoint_id = description.split(" ")[3]
-    symlinks << "/network_interface/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/by-vpce/#{endpoint_id}"
-  elsif (interface_type == "network_load_balancer" or
-         (interface_type == "interface" and requester_id == "amazon-elb")) and
-        description.start_with?("ELB ")
+  if resource["configuration"]["status"] == "in-use"
+    if interface_type == "vpc_endpoint" or
+      (interface_type == "interface" and description.start_with?("VPC Endpoint Interface "))
+      endpoint_id = description.split(" ")[3]
+      symlinks << "/network_interface/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/by-vpce/#{endpoint_id}"
+    elsif (interface_type == "network_load_balancer" or
+           (interface_type == "interface" and requester_id == "amazon-elb")) and
+         description.start_with?("ELB ")
 
-    lb_name = description[4..-1]
+      lb_name = description[4..-1]
 
-    if interface_type == "network_load_balancer" or description.start_with?("ELB app/")
-      lb_name = lb_name.split("/")[0..-2].join("/")
-    end
+      if interface_type == "network_load_balancer" or description.start_with?("ELB app/")
+        lb_name = lb_name.split("/")[0..-2].join("/")
+      end
 
-    lb = "/load_balancer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{lb_name}"
+      lb = "/load_balancer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{lb_name}"
 
-    relations << {
+      relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
         },
@@ -126,117 +131,118 @@ def eni_entity(resource)
           a: path,
           b: lb,
         },
-    }
-  elsif interface_type == "interface" and requester_id == "amazon-elasticsearch" and description.start_with?("ES ")
-    es_name = description.split(" ")[1]
+      }
+    elsif interface_type == "interface" and requester_id == "amazon-elasticsearch" and description.start_with?("ES ")
+      es_name = description.split(" ")[1]
 
-    relations << {
-      metadata: {
-        type: "/relation/v1/is_part_of",
-      },
-      properties: {
-        a: path,
-        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/elasticsearch/#{es_name}",
-      },
-    }
-  elsif interface_type == "interface" and
-       resource["configuration"].has_key?("attachment") and
-       resource["configuration"]["attachment"].has_key?("instanceId")
-    instance_id = resource["configuration"]["attachment"]["instanceId"]
+      relations << {
+        metadata: {
+          type: "/relation/v1/is_part_of",
+        },
+        properties: {
+          a: path,
+          b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/elasticsearch/#{es_name}",
+        },
+      }
+    elsif interface_type == "interface" and
+         resource["configuration"].has_key?("attachment") and
+         resource["configuration"]["attachment"].has_key?("instanceId")
+      instance_id = resource["configuration"]["attachment"]["instanceId"]
 
-    relations << {
-      metadata: {
-        type: "/relation/v1/is_part_of",
-      },
-      properties: {
-        a: path,
-        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{instance_id}",
-      },
-    }
-  elsif interface_type == "interface" and description.start_with?("AWS Lambda VPC ENI")
-    name = requester_id.split(":")[1]
+      relations << {
+        metadata: {
+          type: "/relation/v1/is_part_of",
+        },
+        properties: {
+          a: path,
+          b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{instance_id}",
+        },
+      }
+    elsif interface_type == "interface" and description.start_with?("AWS Lambda VPC ENI")
+      name = requester_id.split(":")[1]
 
-    relations << {
-      metadata: {
-        type: "/relation/v1/is_part_of",
-      },
-      properties: {
-        a: path,
-        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/lambda/#{name}",
-      },
-    }
-  elsif interface_type == "interface" and description.start_with?("aws-K8S-")
-    instance_id = requester_id.split(":")[1]
+      relations << {
+        metadata: {
+          type: "/relation/v1/is_part_of",
+        },
+        properties: {
+          a: path,
+          b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/lambda/#{name}",
+        },
+      }
+    elsif interface_type == "interface" and description.start_with?("aws-K8S-")
+      instance_id = requester_id.split(":")[1]
 
-    relations << {
-      metadata: {
-        type: "/relation/v1/is_part_of",
-      },
-      properties: {
-        a: path,
-        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{instance_id}",
-      },
-    }
-  elsif interface_type == "interface" and requester_id == "amazon-elasticache" and description.start_with?("ElastiCache")
-    ec_name = description.split(/[ +]/)[1]
+      relations << {
+        metadata: {
+          type: "/relation/v1/is_part_of",
+        },
+        properties: {
+          a: path,
+          b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{instance_id}",
+        },
+      }
+    elsif interface_type == "interface" and requester_id == "amazon-elasticache" and description.start_with?("ElastiCache")
+      ec_name = description.split(/[ +]/)[1]
 
-    relations << {
-      metadata: {
-        type: "/relation/v1/is_part_of",
-      },
-      properties: {
-        a: path,
-        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/elasticache/#{es_name}",
-      },
-    }
-  elsif interface_type == "interface" and
-       requester_id == "AROAR7QNRWZMXEDBBSGGK:AmazonEKS" and
-       description.start_with?("Amazon EKS ")
-    eks_name = description[11..-1]
+      relations << {
+        metadata: {
+          type: "/relation/v1/is_part_of",
+        },
+        properties: {
+          a: path,
+          b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/elasticache/#{ec_name}",
+        },
+      }
+    elsif interface_type == "interface" and
+         requester_id == "AROAR7QNRWZMXEDBBSGGK:AmazonEKS" and
+         description.start_with?("Amazon EKS ")
+      eks_name = description[11..-1]
 
-    relations << {
-      metadata: {
-        type: "/relation/v1/is_part_of",
-      },
-      properties: {
-        a: path,
-        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/eks/#{eks_name}",
-      },
-    }
-  elsif interface_type == "nat_gateway" and description.start_with?("Interface for NAT Gateway ")
-    nat_id = description.split(" ")[4]
+      relations << {
+        metadata: {
+          type: "/relation/v1/is_part_of",
+        },
+        properties: {
+          a: path,
+          b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/eks/#{eks_name}",
+        },
+      }
+    elsif interface_type == "nat_gateway" and description.start_with?("Interface for NAT Gateway ")
+      nat_id = description.split(" ")[4]
 
-    relations << {
-      metadata: {
-        type: "/relation/v1/is_part_of",
-      },
-      properties: {
-        a: path,
-        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/nat/#{nat_id}",
-      },
-    }
-  elsif interface_type == "interface" and description.start_with?("EFS mount target for ")
-    fs_id = description.split(" ")[4]
+      relations << {
+        metadata: {
+          type: "/relation/v1/is_part_of",
+        },
+        properties: {
+          a: path,
+          b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/nat/#{nat_id}",
+        },
+      }
+    elsif interface_type == "interface" and description.start_with?("EFS mount target for ")
+      fs_id = description.split(" ")[4]
 
-    relations << {
-      metadata: {
-        type: "/relation/v1/is_part_of",
-      },
-      properties: {
-        a: path,
-        b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/efs/#{fs_id}",
-      },
-    }
-  elsif interface_type == "interface" and (requester_id == "amazon-rds" or requester_id == "062191066759" or requester_id == "082811663747")
+      relations << {
+        metadata: {
+          type: "/relation/v1/is_part_of",
+        },
+        properties: {
+          a: path,
+          b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/efs/#{fs_id}",
+        },
+      }
+    elsif interface_type == "interface" and (requester_id == "amazon-rds" or requester_id == "062191066759" or requester_id == "082811663747")
     # ignore RDS, relations built in rds_instance_entity
-  elsif interface_type == "interface" and requester_id == "493711992759"
-  # ignore DMS
-  elsif interface_type == "interface" and requester_id == "953619373526"
-  # ignore Directory Services
-  elsif resource["configuration"]["status"] == "available"
+    elsif interface_type == "interface" and requester_id == "493711992759"
+    # ignore DMS
+    elsif interface_type == "interface" and requester_id == "953619373526"
+    # ignore Directory Services
+    elsif resource["configuration"]["status"] == "available"
     # ignore unbound ENIs
-  else
-    raise "Unknown ENI: #{JSON.pretty_generate(resource)}"
+    else
+      raise "Unknown ENI: #{JSON.pretty_generate(resource)}"
+    end
   end
 
   {
@@ -360,11 +366,97 @@ def lambda_entity(resource)
 end
 
 
-
+EFS_BANNED_REGIONS = [ "eu-north-1", "sa-east-1" ]
 
 class AWS
 
   def sync
+    sync_elasticsearch + sync_elasticache + sync_efs + sync_config
+  end
+
+  def account_id
+    @account_id ||= begin
+                      client = Aws::STS::Client.new
+                      client.get_caller_identity.account
+                    end
+  end
+
+  def regions
+    @regions ||= begin
+                   client = Aws::EC2::Client.new
+                   client.describe_regions.regions.map { |r| r.region_name }
+                 end
+  end
+
+  def sync_elasticsearch
+    regions.map { |region|
+      client = Aws::ElasticsearchService::Client.new(region: region)
+      client.list_domain_names.domain_names.map { |dn|
+        domain_name = dn[:domain_name]
+
+        path = "/computer/aws/#{account_id}/#{region}/elasticsearch/#{domain_name}"
+
+        {
+          path: path,
+          entity: {
+            metadata: {
+              type: "/entity/v1/computer",
+            },
+            properties: {
+              provider: "aws",
+              image: "aws-elasticsearch",
+            }
+          },
+        }
+      }
+    }.flatten
+  end
+
+  def sync_elasticache
+    regions.map { |region|
+      client = Aws::ElastiCache::Client.new(region: region)
+      client.describe_cache_clusters.cache_clusters.map { |cluster|
+        path = "/computer/aws/#{account_id}/#{region}/elasticache/#{cluster.cache_cluster_id}"
+
+        {
+          path: path,
+          entity: {
+            metadata: {
+              type: "/entity/v1/computer",
+            },
+            properties: {
+              provider: "aws",
+              image: "aws-elasticache",
+            }
+          },
+        }
+      }
+    }.flatten
+  end
+
+  def sync_efs
+    regions.reject { |r| EFS_BANNED_REGIONS.include? r }.map { |region|
+      client = Aws::EFS::Client.new(region: region)
+      client.describe_file_systems.file_systems.map { |fs|
+        path = "/computer/aws/#{account_id}/#{region}/efs/#{fs.file_system_id}"
+
+        {
+          path: path,
+          entity: {
+            metadata: {
+              type: "/entity/v1/computer",
+            },
+            properties: {
+              provider: "aws",
+              image: "aws-efs",
+            }
+          },
+        }
+      }
+    }.flatten
+  end
+
+  def sync_config
     client = Aws::ConfigService::Client.new
     type_conversion = {
       "AWS::EC2::EIP" => method(:eip_entity),
@@ -375,11 +467,6 @@ class AWS
       "AWS::ElasticLoadBalancingV2::LoadBalancer" => method(:lb_entity),
       "AWS::RDS::DBInstance" => method(:rds_instance_entity),
       "AWS::Lambda::Function" => method(:lambda_entity),
-
-      # These aren't in Config yet, but we map ENIs to them
-      # ES instances
-      # ElastiCache
-      # EFS
     }
 
     next_token = nil

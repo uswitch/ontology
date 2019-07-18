@@ -5,10 +5,11 @@ require 'json'
 require 'json_schemer'
 require 'parallel'
 require 'set'
+require 'yaml'
 
 class Store
 
-  def self.from_directories(directories, progress: nil, validate: true, glob: File.join("**", "*.{json}"))
+  def self.from_directories(directories, progress: nil, validate: true, glob: File.join("**", "*.{json,yaml}"))
     store = Store.new
 
     all_things = directories.map { |directory|
@@ -28,7 +29,11 @@ class Store
 
       Parallel.map(files, in_threads: 10, progress: parse_progress) { |file|
         path = File.join(base, file)
-        id = "/#{File.dirname(file)}/#{File.basename(file, ".*")}"
+        if (dirname = "#{File.dirname(file)}/") == "./"
+          dirname = ""
+        end
+
+        id = "/#{dirname}#{File.basename(file, ".*")}"
 
         if File.symlink?(path)
           link = File.readlink(path)
@@ -49,13 +54,27 @@ class Store
               "link" => link_id,
             },
           }
-        else
+        elsif File.extname(file) == ".json"
           parsed = JSON.parse(File.read(path))
 
           raise "bad file: #{path}" if not parsed.has_key?("metadata")
 
           if not parsed["metadata"].has_key?("id")
             parsed["metadata"]["id"] = id
+          end
+        elsif File.extname(file) == ".yaml"
+          parsed = []
+          File.open( path ) do |yf|
+            idx = 0
+            YAML.load_stream( yf ) do |ydoc|
+              if not ydoc["metadata"].has_key?("id")
+                ydoc["metadata"]["id"] = "#{id}/#{idx}"
+              end
+
+              parsed << ydoc
+
+              idx += 1
+            end
           end
         end
 

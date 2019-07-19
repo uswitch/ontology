@@ -4,6 +4,7 @@
     },
     "properties": {
         "parent": "/relation/v1",
+        "template": "{{{ a }}} is part of {{{ b }}}",
         "spec": {
         }
     }

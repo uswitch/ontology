@@ -4,6 +4,7 @@
     },
     "properties": {
         "parent": "/relation/v1",
+        "template": "{{{ a }}} was built by {{{ b }}}@{{ ref }} at {{ at }}",
         "spec": {
             "a": {
                 "type": "string",

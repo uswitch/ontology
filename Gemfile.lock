@@ -152,6 +152,7 @@ GEM
     multi_json (1.13.1)
     multi_xml (0.6.0)
     multipart-post (2.1.1)
+    mustache (1.1.0)
     octokit (4.14.0)
       sawyer (~> 0.8.0, >= 0.5.3)
     os (1.0.1)
@@ -197,6 +198,7 @@ DEPENDENCIES
   json_schemer
   k8s-client
   ms_rest
+  mustache
   octokit (~> 4.0)
   parallel
   ruby-progressbar

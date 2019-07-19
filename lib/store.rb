@@ -51,7 +51,8 @@ class Instance
   end
 
   def to_s
-    "#{id}[#{type}]: #{properties}"
+    #"#{id}[#{type}]: #{properties}"
+    @h.to_s
   end
 
   def to_str
@@ -95,7 +96,7 @@ class Store
           end
 
           link_file = link[base.length..-1]
-          link_id = "/#{File.dirname(link_file)}/#{File.basename(link_file, ".*")}"
+          link_id = "#{File.dirname(link_file)}/#{File.basename(link_file, ".*")}"
 
           parsed = {
             "metadata" => {
@@ -120,7 +121,11 @@ class Store
             idx = 0
             YAML.load_stream( yf ) do |ydoc|
               if not ydoc["metadata"].has_key?("id")
-                ydoc["metadata"]["id"] = "#{id}/#{idx}"
+                suffix = ""
+                if idx > 0
+                  suffix = "/#{idx}"
+                end
+                ydoc["metadata"]["id"] = "#{id}#{suffix}"
               end
 
               parsed << ydoc
@@ -170,10 +175,12 @@ class Store
       load_progress.increment
     }
     all_relations.each { |thing|
-      if store.valid?(thing)
-        store.add!(thing, validate: false)
+      errors = store.validate(thing)
+
+      if errors.any?
+        $stderr.puts "Dropping invalid relation: #{thing} #{errors}"
       else
-        $stderr.puts "Dropping invalid relation: #{thing}'"
+        store.add!(thing, validate: false)
       end
 
       load_progress.increment
@@ -193,10 +200,10 @@ class Store
     @relations_by_id = {}
     @relations_by_entity_id = Hash.new { |h, k| h[k] = [] }
 
-    base_type = {
+    base_type = Instance.new({
       "metadata" => { "id" => "/type", "type" => "/type" },
       "properties" => { }
-    }
+    })
 
     @types = [base_type]
     @types_by_id = { "/type" => base_type, "/link" => base_type }
@@ -223,7 +230,7 @@ class Store
         @types << instance
         @types_by_id[instance.id] = instance
       elsif instance.type.start_with?("/link")
-        @entities_by_id[id] = instance
+        @entities_by_id[instance.id] = instance
       else
         $stderr.puts "Unknown type: #{type}"
       end
@@ -232,16 +239,20 @@ class Store
     instance
   end
 
-  def valid?(instance, ignore_pointers: false)
+  def valid?(instance)
+    return ! validate(instance).any?
+  end
+
+  def validate(instance)
     instance = Instance.new(instance) if instance.is_a?(Hash)
 
-    return false if instance.valid?
+    return ["Not a proper instance"] if instance.valid?
 
-    return true if instance.id == "/type"
+    return [] if instance.id == "/type"
 
     type = @types_by_id[instance.type]
 
-    return false if not (type and valid?(type))
+    return ["No associated, valid type"] if not (type and valid?(type))
 
     type_hierarchy = [type]
     curr_type = type
@@ -255,7 +266,7 @@ class Store
                     .map { |t| t["spec"] }
                     .reduce({}, &:deep_merge)
 
-    return true if merged_spec.empty? and not instance.empty?
+    return [] if merged_spec.empty? and not instance.empty?
 
     schema = {
       "type" => "object",
@@ -266,7 +277,7 @@ class Store
 
     keywords = {
       "pointer_to" => ->(data, schema) {
-        kind_of?(@entities_by_id[data], schema["pointer_to"])
+        type_of?(@entities_by_id[data], schema["pointer_to"])
       },
     }
 
@@ -275,10 +286,14 @@ class Store
       keywords: keywords,
     )
 
-    return schemer.valid?(instance.properties)
+    return schemer.validate(instance.properties)
   end
 
-  def kind_of?(instance, type_id)
+  def type_of(instance)
+    @types_by_id[instance.type]
+  end
+
+  def type_of?(instance, type_id)
     return false if not instance or not type_id or not @types_by_id.key?(type_id)
 
     thing_type_id = instance.type
@@ -341,7 +356,7 @@ class Store
   def resolve(instance)
     e = @entities_by_id[instance_or_id_to_id(instance)]
     if e and e.type.start_with? "/link"
-      resolve(idx, e["link"])
+      resolve(e["link"])
     elsif e and e.type.start_with? "/entity"
       e
     else

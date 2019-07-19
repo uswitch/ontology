@@ -1,0 +1,109 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+require 'mustache'
+require 'ruby-progressbar'
+
+require_relative "../lib/store.rb"
+
+PROGRESSBAR_SETTINGS = {format: '%t |%E | %B | %a', output: $stderr}
+
+if not ARGV.count > 1
+  $stderr.puts "html out_path in_path..."
+  exit 1
+end
+
+out_directory = ARGV[0]
+directories = ARGV[1..-1]
+
+store = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
+
+FileUtils.mkdir_p(out_directory)
+
+
+def relation_html(store, relation, entity: nil)
+  a = store.resolve(relation["a"])
+  b = store.resolve(relation["b"])
+
+  if entity != nil and a.id == entity.id
+    a_html = a.name
+  else
+    a_html = "<a href=\"#{a.id}.html\">#{a.name}</a>"
+  end
+
+  if entity != nil and b.id == entity.id
+    b_html = b.name
+  else
+    b_html = "<a href=\"#{b.id}.html\">#{b.name}</a>"
+  end
+
+  type = store.type_of(relation)
+
+  if type["template"]
+    template = type["template"]
+  else
+    template = "{{{ a }}} -> {{{ b }}}"
+  end
+
+  template_props = relation.properties.clone
+  template_props["a"] = a_html
+  template_props["b"] = b_html
+
+  Mustache.render(template, template_props)
+end
+
+entities_bar = ProgressBar.create(title: "Writing entities html", total: store.entities.count, **PROGRESSBAR_SETTINGS)
+
+store.entities.each { |entity|
+  type = store.type_of(entity)
+  relations = store.relations_for(entity)
+
+  html = <<HTMLBLOCK
+<!doctype html>
+<h1>#{entity.name}</h1>
+<sub>#{type.name}</sub>
+<h2>Relations</h2>
+<ul>
+#{relations.map { |r| "<li>#{relation_html(store, r, entity: entity)}</li>" }.join}
+</ul>
+HTMLBLOCK
+
+  path = File.join(out_directory, entity.id) + ".html"
+
+  FileUtils.mkdir_p(File.dirname(path))
+  File.write(path, html)
+
+  entities_bar.increment
+}
+
+types_bar = ProgressBar.create(title: "Writing types html", total: store.types.count, **PROGRESSBAR_SETTINGS)
+
+store.types.each { |type|
+  html = <<HTMLBLOCK
+<!doctype html>
+<h1>#{type.name}</h1>
+HTMLBLOCK
+
+  path = File.join(out_directory, type.id) + ".html"
+
+  FileUtils.mkdir_p(File.dirname(path))
+  File.write(path, html)
+
+  types_bar.increment
+}
+
+relations_bar = ProgressBar.create(title: "Writing relations html", total: store.relations.count, **PROGRESSBAR_SETTINGS)
+
+store.relations.each { |relation|
+  html = <<HTMLBLOCK
+<!doctype html>
+<h1>#{relation.name}</h1>
+HTMLBLOCK
+
+  path = File.join(out_directory, relation.id) + ".html"
+
+  FileUtils.mkdir_p(File.dirname(path))
+  File.write(path, html)
+
+  relations_bar.increment
+}

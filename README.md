@@ -52,3 +52,7 @@ cloud.rvu.ontology/relation/v1/is_part_of: /rvu/mortgages/bankrate/front-end
 tags:
   cloud.rvu.ontology/relation/v1/is_part_of: /rvu/platform/airship/logging
 ```
+
+## Output
+
+Mustache templates used as they do not limit us to Ruby, which is mostly a language to prototype this in.

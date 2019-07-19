@@ -7,6 +7,58 @@ require 'parallel'
 require 'set'
 require 'yaml'
 
+class Instance
+  def initialize(h)
+    @h = h.clone
+
+    if not @h.has_key?("properties")
+      @h["properties"] = {}
+    end
+  end
+
+  def valid?
+    not (@h.has_key?("metadata") and
+         @h["metadata"].has_key?("id") and
+         @h["metadata"].has_key?("type"))
+  end
+
+  def id
+    @h["metadata"]["id"]
+  end
+
+  def name
+    if @h["metadata"].has_key?("name")
+      @h["metadata"]["name"]
+    else
+      id.split("/")[-1]
+    end
+  end
+
+  def type
+    @h["metadata"]["type"]
+  end
+
+  def properties
+    @h["properties"]
+  end
+
+  def [](k)
+    @h["properties"][k]
+  end
+
+  def empty?
+    @h["properties"].empty?
+  end
+
+  def to_s
+    "#{id}[#{type}]: #{properties}"
+  end
+
+  def to_str
+    to_s
+  end
+end
+
 class Store
 
   def self.from_directories(directories, progress: nil, validate: true, glob: File.join("**", "*.{json,yaml}"))
@@ -130,13 +182,14 @@ class Store
     store
   end
 
-  attr_reader :relations, :entities
+  attr_reader :relations, :entities, :types
 
   def initialize
     @add_mutex = Mutex.new
     @relations = []
     @entities = []
     @entities_by_id = {}
+    @entities_by_type_id = Hash.new { |h, k| h[k] = [] }
     @relations_by_id = {}
     @relations_by_entity_id = Hash.new { |h, k| h[k] = [] }
 
@@ -150,57 +203,59 @@ class Store
   end
 
   def add!(thing, validate: true)
-    id = thing["metadata"]["id"]
-    type = thing["metadata"]["type"]
+    instance = Instance.new(thing)
 
     raise "Invalid thing: #{thing}" if validate and not valid?(thing)
 
     @add_mutex.synchronize {
-      if type.start_with?("/entity")
-        $stderr.puts "Overwriting id #{id}" if @entities_by_id.has_key?(id)
+      if instance.type.start_with?("/entity")
+        $stderr.puts "Overwriting id #{id}" if @entities_by_id.has_key?(instance.id)
 
-        @entities << thing
-        @entities_by_id[id] = thing
-      elsif type.start_with?("/relation")
-        @relations << thing
-        @relations_by_id[thing["metadata"]["id"]] = thing
-        @relations_by_entity_id[thing["properties"]["a"]] << thing
-        @relations_by_entity_id[thing["properties"]["b"]] << thing
-      elsif type.start_with?("/type")
-        @types << thing
-        @types_by_id[thing["metadata"]["id"]] = thing
-      elsif type.start_with?("/link")
-        @entities_by_id[id] = thing
+        @entities << instance
+        @entities_by_id[instance.id] = instance
+        @entities_by_type_id[instance.type] << instance
+      elsif instance.type.start_with?("/relation")
+        @relations << instance
+        @relations_by_id[instance.id] = instance
+        @relations_by_entity_id[instance["a"]] << instance
+        @relations_by_entity_id[instance["b"]] << instance
+      elsif instance.type.start_with?("/type")
+        @types << instance
+        @types_by_id[instance.id] = instance
+      elsif instance.type.start_with?("/link")
+        @entities_by_id[id] = instance
       else
         $stderr.puts "Unknown type: #{type}"
       end
     }
+
+    instance
   end
 
-  def valid?(thing, ignore_pointers: false)
-    return false if not (thing.has_key?("metadata") and
-                         thing["metadata"].has_key?("id") and
-                         thing["metadata"].has_key?("type"))
+  def valid?(instance, ignore_pointers: false)
+    instance = Instance.new(instance) if instance.is_a?(Hash)
 
-    return true if thing["metadata"]["id"] == "/type"
+    return false if instance.valid?
 
-    type = @types_by_id[thing["metadata"]["type"]]
+    return true if instance.id == "/type"
+
+    type = @types_by_id[instance.type]
 
     return false if not (type and valid?(type))
 
     type_hierarchy = [type]
     curr_type = type
 
-    while parent_id = curr_type["properties"]["parent"] and parent = @types_by_id[parent_id]
+    while parent_id = curr_type["parent"] and parent = @types_by_id[parent_id]
       type_hierarchy << parent
       curr_type = parent
     end
 
     merged_spec = type_hierarchy.reverse
-                    .map { |t| t["properties"]["spec"] }
+                    .map { |t| t["spec"] }
                     .reduce({}, &:deep_merge)
 
-    return true if merged_spec.empty? and not thing.has_key?("properties")
+    return true if merged_spec.empty? and not instance.empty?
 
     schema = {
       "type" => "object",
@@ -209,26 +264,24 @@ class Store
 
     keywords = {}
 
-    if not ignore_pointers
-      keywords = {
-        "pointer_to" => ->(data, schema) {
-          kind_of?(@entities_by_id[data], schema["pointer_to"])
-        },
-      }
-    end
+    keywords = {
+      "pointer_to" => ->(data, schema) {
+        kind_of?(@entities_by_id[data], schema["pointer_to"])
+      },
+    }
 
     schemer = JSONSchemer.schema(
       schema,
       keywords: keywords,
     )
 
-    return schemer.valid?(thing["properties"])
+    return schemer.valid?(instance.properties)
   end
 
-  def kind_of?(thing, type_id)
-    return false if not thing or not type_id or not @types_by_id.key?(type_id)
+  def kind_of?(instance, type_id)
+    return false if not instance or not type_id or not @types_by_id.key?(type_id)
 
-    thing_type_id = thing["metadata"]["type"]
+    thing_type_id = instance.type
 
     begin
       return true if thing_type_id = type_id
@@ -240,20 +293,40 @@ class Store
     return false
   end
 
+  def entities_by_type(type_id)
+    @entities_by_type_id[type_id]
+  end
+
   def all_relations_valid?
     @relations.all? { |rel| valid?(rel) }
   end
 
-  def all_relations_for(id)
+  def instance_or_id_to_id(instance)
+    if instance.is_a?(String)
+      id = instance
+    elsif instance.is_a?(Instance)
+      id = instance.id
+    else
+      raise "Unknown thing to id: #{instance}"
+    end
+
+    id
+  end
+
+  def relations_for(instance)
+    @relations_by_entity_id[instance_or_id_to_id(instance)]
+  end
+
+  def all_relations_for(instance)
     seen = Set.new
-    to_traverse = @relations_by_entity_id[id]
+    to_traverse = @relations_by_entity_id[instance_or_id_to_id(instance)]
 
     begin
       to_traverse.each { |rel| seen.add(rel) }
 
       to_traverse = to_traverse.map { |rel|
-        a = rel["properties"]["a"]
-        b = rel["properties"]["b"]
+        a = rel["a"]
+        b = rel["b"]
 
         a_rels = @relations_by_entity_id[a]
         b_rels = @relations_by_entity_id[b]
@@ -265,16 +338,19 @@ class Store
     seen.to_a
   end
 
-  def resolve(id)
-    e = @entities_by_id[id]
-    if e and e["metadata"]["type"].start_with? "/link"
-      resolve(idx, e["properties"]["link"])
-    elsif e and e["metadata"]["type"].start_with? "/entity"
+  def resolve(instance)
+    e = @entities_by_id[instance_or_id_to_id(instance)]
+    if e and e.type.start_with? "/link"
+      resolve(idx, e["link"])
+    elsif e and e.type.start_with? "/entity"
       e
     else
       nil
     end
   end
 
+  def entity_by_id(id)
+    @entitiy_by_id[id]
+  end
 
 end

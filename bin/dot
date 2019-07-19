@@ -7,6 +7,7 @@ require_relative "../lib/store.rb"
 
 if not ARGV.count > 1
   $stderr.puts "dot path... root"
+  exit 1
 end
 
 root_id = ARGV[-1]
@@ -15,13 +16,13 @@ directories = ARGV[0..-2]
 store = Store.from_directories(directories, progress: {format: '%t |%E | %B | %a', output: $stderr})
 
 def node_id(entity)
-  "a#{Digest::SHA1.hexdigest(entity["metadata"]["id"])}"
+  "a#{Digest::SHA1.hexdigest(entity.id)}"
 end
 
 def dot(store, id)
   all_relations = store.all_relations_for(id)
   all_pairs = all_relations.map { |rel|
-    [ store.resolve(rel["properties"]["a"]), store.resolve(rel["properties"]["b"]) ]
+    [ store.resolve(rel["a"]), store.resolve(rel["b"]) ]
   }
   all_entities = all_pairs.flatten.to_set
 
@@ -30,7 +31,7 @@ def dot(store, id)
   out << "digraph ontology {"
 
   all_entities.each { |entity|
-    id = entity["metadata"]["id"]
+    id = entity.id
     hash = node_id(entity)
     out << "  #{hash} [label=\"#{id}\"];"
   }

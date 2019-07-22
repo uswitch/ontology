@@ -12,8 +12,8 @@ require_relative "../lib/external/github.rb"
 require_relative "../lib/external/kubernetes.rb"
 
 sources = [
-#  AD.new,
-  AWS.new,
+  AD.new,
+#  AWS.new,
 #  DockerRegistry.new,
 #  GCP.new,
 #  GitHub.new,

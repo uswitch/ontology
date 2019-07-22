@@ -1,9 +1,37 @@
 metadata:
   type: /entity/v1/team
   id: /rvu/airship
+
+# Team is part of
 ---
 metadata:
   type: /relation/v1/is_part_of
 properties:
   a: /rvu/airship
   b: /rvu
+
+# People in the team
+---
+metadata:
+  type: /relation/v1/is_part_of
+properties:
+  a: /person/by-email/tom.booth@rvu.co.uk
+  b: /rvu/airship
+---
+metadata:
+  type: /relation/v1/is_part_of
+properties:
+  a: /person/by-email/joseph.irving@rvu.co.uk
+  b: /rvu/airship
+---
+metadata:
+  type: /relation/v1/is_part_of
+properties:
+  a: /person/by-email/jay.siyani@rvu.co.uk
+  b: /rvu/airship
+---
+metadata:
+  type: /relation/v1/is_part_of
+properties:
+  a: /person/by-email/a-dmitry.scherbakov@rvu.co.uk
+  b: /rvu/airship

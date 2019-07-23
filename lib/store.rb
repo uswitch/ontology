@@ -178,7 +178,11 @@ class Store
       errors = store.validate(thing)
 
       if errors.any?
-        $stderr.puts "Dropping invalid relation: #{thing} #{errors}"
+        error_strings = []
+
+        errors.each { |error| error_strings << error.to_s }
+
+        $stderr.puts "Dropping invalid relation: #{thing} #{error_strings}"
       else
         store.add!(thing, validate: false)
       end

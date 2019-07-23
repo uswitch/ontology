@@ -3,7 +3,7 @@
         "type": "/type"
     },
     "properties": {
-        "parent": "/entity/v1",
+        "parent": "/entity/v1/workload",
         "spec": {}
     }
 }

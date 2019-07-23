@@ -4,6 +4,51 @@ require 'uri'
 
 #puts response.body, response.code, response.message, response.headers.inspect
 
+# stolen from github.com/distribution/reference
+REFERENCE_REGEX = /^((?:(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])(?:(?:\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]))+)?(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:(?:[._]|__|[-]*)[a-z0-9]+)+)?(?:(?:\/[a-z0-9]+(?:(?:(?:[._]|__|[-]*)[a-z0-9]+)+)?)+)?)(?::([\w][\w.-]{0,127}))?(?:@([A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}))?$/
+DIGEST_REGEX = /[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}/
+
+DIGEST_LENGTHS = {
+  "sha256" => 64,
+  "sha512" => 128,
+}
+
+def parse_image_reference(reference)
+  raise "ErrNameEmpty" if reference.length == 0
+
+  ref_match = REFERENCE_REGEX.match(reference)
+
+  raise "ErrReferenceInvalidFormat" if not ref_match
+
+  domain_uri = URI("http://" + ref_match[1])
+
+  if ref_match[0].include?("@")
+    digest_match = DIGEST_REGEX.match(ref_match[0].split("@")[1])
+
+    if digest_match
+      digest_type = digest_match[0].split(":")[0]
+      if DIGEST_LENGTHS.has_key?(digest_type)
+        if digest_match[0].split(":")[-1].length != DIGEST_LENGTHS[digest_type]
+          raise "digest.ErrDigestInvalidLength"
+        end
+      else
+        raise "digest.ErrDigestUnsupported"
+      end
+    else
+      raise "invalid digest"
+    end
+  end
+
+  raise "ErrNameTooLong" if ref_match[1].length > 255
+
+  {
+    repository: ref_match[1],
+    domain: domain_uri.host + ((domain_uri.port && domain_uri.port != 80) ? ":#{domain_uri.port}" : ""),
+    tag: (ref_match[2] == nil or ref_match[2].length == 0) ? "latest" : ref_match[2],
+    digest: digest_match ? digest_match[0] : nil,
+  }
+end
+
 def next_link(response)
   next_url = nil
   if response.headers.key? "link"

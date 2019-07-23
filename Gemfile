@@ -18,3 +18,5 @@ gem 'ruby-progressbar'
 gem 'deep_merge'
 gem 'json_schemer'
 gem 'mustache'
+
+gem "rspec"

@@ -1,0 +1,14 @@
+metadata:
+  type: /type
+properties:
+  parent: /relation/v1
+  template: "{{{ a }}} is running on {{{ b }}}"
+  spec:
+    a:
+      type: string
+      pointer_to: /entity/v1/workload
+      required: true
+    b:
+      type: string
+      pointer_to: /entity/v1/computer
+      required: true

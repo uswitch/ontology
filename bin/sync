@@ -11,16 +11,33 @@ require_relative "../lib/external/gcp.rb"
 require_relative "../lib/external/github.rb"
 require_relative "../lib/external/kubernetes.rb"
 
-sources = [
-#  AD.new,
-#  AWS.new,
-#  DockerRegistry.new,
+providers = {
+  "ad" =>  AD.new,
+  "aws" => AWS.new,
+  "docker" => DockerRegistry.new,
 #  GCP.new,
-#  GitHub.new,
-  Kubernetes.new,
-]
+  "github" => GitHub.new,
+  "kubernetes" => Kubernetes.new,
+}
 
-Parallel.each(sources) { |source|
+if not ARGV.count > 0
+  $stderr.puts "sync provider..."
+  $stderr.puts "providers: #{providers.keys}"
+  exit 1
+end
+
+to_sync = ARGV.map { |name|
+  if not providers.has_key?(name)
+    $stderr.puts "invalid provider '#{name}'"
+    $stderr.puts "providers: #{providers.keys}"
+    exit 1
+  end
+
+  providers[name]
+}
+
+
+Parallel.each(to_sync) { |source|
   entities_to_store = source.sync
 
   entities_to_store.each { |e|

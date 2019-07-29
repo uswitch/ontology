@@ -30,7 +30,7 @@ paths.each { |path|
   end
 }
 
-store, _ = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
+store = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
 
 files.each { |file|
   $stderr.puts "Loading #{file}"

@@ -176,71 +176,20 @@ class Store
       }
     }.flatten
 
-    all_types = []
-    all_entities = []
-    all_relations = []
-
     if progress
       opts = progress.clone
       opts[:title] = "Loading into store"
-      opts[:total] = all_things.count * 2
+      opts[:total] = all_things.count
 
       load_progress = ProgressBar.create(**opts)
     end
 
     all_things.each { |thing|
-      if thing[:metadata][:type].start_with? "/entity" or
-        thing[:metadata][:type].start_with? "/link"
-        all_entities << thing
-      elsif thing[:metadata][:type].start_with? "/relation"
-        all_relations << thing
-      elsif thing[:metadata][:type].start_with? "/type"
-        all_types << thing
-      else
-        raise "Unknown type '#{thing["metadata"]["type"]}' for '#{thing["metadata"]["id"]}"
-      end
-
-      load_progress.increment
-    }
-
-    invalid_relations = []
-
-    all_types.each { |thing|
       store.add!(thing)
       load_progress.increment
     }
-    all_entities.each { |thing|
-      store.add!(thing)
-      load_progress.increment
-    }
-    all_relations.each { |thing|
-      errors = store.validate(thing)
 
-      if errors.any?
-        formatted_errors = []
-
-        errors.each { |error|
-          if error.is_a? String
-            formatted_errors << { thing: error }
-          else
-            formatted_errors << error.to_h
-          end
-        }
-
-        invalid_relations << {
-          relation: thing,
-          errors: formatted_errors,
-        }
-
-        $stderr.puts "Dropping invalid relation: #{thing} #{error_strings}"
-      else
-        store.add!(thing, validate: false)
-      end
-
-      load_progress.increment
-    }
-
-    return store, invalid_relations
+    return store
   end
 
   attr_reader :relations, :entities, :types
@@ -330,8 +279,8 @@ class Store
     keywords = {}
 
     keywords = {
-      "pointer_to" => ->(data, schema) {
-        type_of?(@entities_by_id[data], schema["pointer_to"])
+      :pointer_to => ->(data, schema) {
+        type_of?(@entities_by_id[data], schema[:pointer_to])
       },
     }
 

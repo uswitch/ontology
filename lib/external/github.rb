@@ -55,6 +55,8 @@ class GitHub
             type: "/entity/v1/repository",
           },
           properties: {
+            archvied: repo[:archived],
+            disabled: repo[:disabled],
             language: repo[:language],
             license: repo.has_key?(:license) ? repo[:license][:key] : nil,
             created_at: repo[:created_at],

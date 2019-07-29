@@ -40,16 +40,18 @@ class GitHub
       rescue Octokit::NotFound
       end
 
+      id = "/repository/github.com/#{repo.full_name}"
+
       relations = []
 
       if repo_h.has_key?(:metadata) and repo_h[:metadata].has_key?(:tags)
-        relations += labels_to_relations("/repository/github.com/#{repo.full_name}", repo_h[:metadata][:tags])
+        relations += labels_to_relations(id, repo_h[:metadata][:tags])
       end
 
-      {
-        path: "/repository/github.com/#{repo.full_name}",
-        entity: {
+      [
+        {
           metadata: {
+            id: id,
             type: "/entity/v1/repository",
           },
           properties: {
@@ -60,8 +62,7 @@ class GitHub
             pushed_at: repo[:pushed_at],
           },
         },
-        relations: relations,
-      }
-    }
+      ] + add_ids_to(relations, base: id)
+    }.flatten
   end
 end

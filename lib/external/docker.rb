@@ -96,12 +96,8 @@ class DockerRegistry
             }
           end
 
-          {
-            path: path,
-            symlinks: [
-              "/container/registry.usw.co/#{repo}/#{tag}",
-            ],
-            entity: {
+          alias_entity(
+            {
               metadata: {
                 type: "/entity/v1/container",
               },
@@ -110,8 +106,11 @@ class DockerRegistry
                 created_at: created_from(manifest),
               },
             },
-            relations: relations,
-          }
+            id: path,
+            aliases: [
+              "/container/registry.usw.co/#{repo}/#{tag}",
+            ],
+          ) + add_ids_to(relations, base: path)
         rescue StandardError => e
           $stderr.puts manifest
           $stderr.puts e.message

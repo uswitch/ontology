@@ -4,6 +4,8 @@ require "digest"
 require "parallel"
 require "ruby-progressbar"
 
+require_relative "../lib/store.rb"
+
 require_relative "../lib/external/ad.rb"
 require_relative "../lib/external/aws.rb"
 require_relative "../lib/external/docker.rb"
@@ -36,48 +38,8 @@ to_sync = ARGV.map { |name|
   providers[name]
 }
 
-
 Parallel.each(to_sync) { |source|
-  entities_to_store = source.sync
-
-  entities_to_store.each { |e|
-    next if not e.has_key?(:path)
-
-    file = "./external#{e[:path]}.json"
-    dir = File.dirname(file)
-
-    FileUtils.mkdir_p(dir)
-
-    File.write(file, JSON.pretty_generate(e[:entity]))
-
-    if e.has_key?(:symlinks) && e[:symlinks].count > 0
-      full_path = File.expand_path(file)
-
-      e[:symlinks].each { |symlink|
-        symlink_path = "./external#{symlink}.json"
-        symlink_dir = File.dirname(symlink_path)
-
-        FileUtils.mkdir_p(symlink_dir)
-
-        if File.symlink?(symlink_path)
-          File.delete(symlink_path)
-        end
-
-        File.symlink(full_path, symlink_path)
-      }
-    end
-
-    if e.has_key?(:relations) && e[:relations].count > 0
-      FileUtils.mkdir_p("./external#{e[:path]}")
-
-      e[:relations].each { |relation|
-        relation_json = JSON.pretty_generate(relation)
-
-        hash = Digest::SHA2.hexdigest relation_json
-        file = file = "./external#{e[:path]}/#{hash}.json"
-
-        File.write(file, relation_json)
-      }
-    end
+  source.sync.each { |thing|
+    puts JSON.dump(thing)
   }
 }

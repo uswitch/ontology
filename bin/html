@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'fileutils'
+require 'json'
 require 'mustache'
 require 'ruby-progressbar'
 
@@ -14,24 +15,49 @@ if not ARGV.count > 1
 end
 
 out_directory = ARGV[0]
-directories = ARGV[1..-1]
+paths = ARGV[1..-1]
 
-store = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
+directories = []
+files = []
+
+paths.each { |path|
+  if File.directory?(path)
+    directories << path
+  elsif File.file?(path)
+    files << path
+  else
+    $stderr.puts "Unknown path type: #{path}"
+  end
+}
+
+store, _ = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
+
+files.each { |file|
+  $stderr.puts "Loading #{file}"
+  File.readlines(file).each { |thing|
+    parsed_thing = JSON.parse(thing, symbolize_names: true)
+    $stderr.puts "Problem in #{file} #{parsed_thing}" if not parsed_thing.has_key?(:metadata)
+    store.add!(parsed_thing)
+  }
+}
 
 FileUtils.mkdir_p(out_directory)
 
 
 def relation_html(store, relation, entity: nil)
-  a = store.resolve(relation["a"])
-  b = store.resolve(relation["b"])
+  a, b = store.resolve(relation)
 
-  if entity != nil and a.id == entity.id
+  if a == nil
+    a_html = relation[:a]
+  elsif entity != nil and a.id == entity.id
     a_html = a.name
   else
     a_html = "<a href=\"#{a.id}.html\">#{a.name}</a>"
   end
 
-  if entity != nil and b.id == entity.id
+  if b == nil
+    b_html = relation[:b]
+  elsif entity != nil and b.id == entity.id
     b_html = b.name
   else
     b_html = "<a href=\"#{b.id}.html\">#{b.name}</a>"
@@ -39,15 +65,15 @@ def relation_html(store, relation, entity: nil)
 
   type = store.type_of(relation)
 
-  if type["template"]
-    template = type["template"]
+  if type[:template]
+    template = type[:template]
   else
-    template = "{{{ a }}} -> {{{ b }}}"
+    template = "{{{ a }}} --(#{type.id})-> {{{ b }}}"
   end
 
   template_props = relation.properties.clone
-  template_props["a"] = a_html
-  template_props["b"] = b_html
+  template_props[:a] = a_html
+  template_props[:b] = b_html
 
   Mustache.render(template, template_props)
 end

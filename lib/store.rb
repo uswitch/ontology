@@ -7,47 +7,81 @@ require 'parallel'
 require 'set'
 require 'yaml'
 
+module SymbolizeHelper
+  extend self
+
+  def symbolize_recursive(hash)
+    {}.tap do |h|
+      hash.each { |key, value| h[key.to_sym] = transform(value) }
+    end
+  end
+
+  private
+
+  def transform(thing)
+    case thing
+    when Hash; symbolize_recursive(thing)
+    when Array; thing.map { |v| transform(v) }
+    else; thing
+    end
+  end
+
+  refine Hash do
+    def deep_symbolize_keys
+      SymbolizeHelper.symbolize_recursive(self)
+    end
+  end
+
+end
+
+using SymbolizeHelper
+
 class Instance
   def initialize(h)
     @h = h.clone
 
-    if not @h.has_key?("properties")
-      @h["properties"] = {}
+    if not @h.has_key?(:properties)
+      @h[:properties] = {}
     end
   end
 
   def valid?
-    not (@h.has_key?("metadata") and
-         @h["metadata"].has_key?("id") and
-         @h["metadata"].has_key?("type"))
+    not (@h.has_key?(:metadata) and
+         @h[:metadata].has_key?(:id) and
+         @h[:metadata].has_key?(:type))
   end
 
   def id
-    @h["metadata"]["id"]
+    @h[:metadata][:id]
   end
 
   def name
-    if @h["metadata"].has_key?("name")
-      @h["metadata"]["name"]
+    if @h[:metadata].has_key?(:name)
+      @h[:metadata][:name]
     else
       id.split("/")[-1]
     end
   end
 
   def type
-    @h["metadata"]["type"]
+    $stderr.puts @h if not @h.has_key?(:metadata)
+    @h[:metadata][:type]
   end
 
   def properties
-    @h["properties"]
+    @h[:properties]
   end
 
   def [](k)
-    @h["properties"][k]
+    @h[:properties][k]
   end
 
   def empty?
-    @h["properties"].empty?
+    @h[:properties].empty?
+  end
+
+  def to_h
+    @h
   end
 
   def to_s
@@ -108,24 +142,27 @@ class Store
             },
           }
         elsif File.extname(file) == ".json"
-          parsed = JSON.parse(File.read(path))
+          parsed = JSON.parse(File.read(path), symbolize_names: true)
 
-          raise "bad file: #{path}" if not parsed.has_key?("metadata")
+          raise "bad file: #{path}" if not parsed.has_key?(:metadata)
 
-          if not parsed["metadata"].has_key?("id")
-            parsed["metadata"]["id"] = id
+          if not parsed[:metadata].has_key?(:id)
+            parsed[:metadata][:id] = id
           end
         elsif File.extname(file) == ".yaml"
           parsed = []
           File.open( path ) do |yf|
             idx = 0
-            YAML.load_stream( yf ) do |ydoc|
-              if not ydoc["metadata"].has_key?("id")
+            YAML.load_stream( yf ) do |ydoc_raw|
+
+              ydoc = ydoc_raw.deep_symbolize_keys
+
+              if not ydoc[:metadata].has_key?(:id)
                 suffix = ""
                 if idx > 0
                   suffix = "/#{idx}"
                 end
-                ydoc["metadata"]["id"] = "#{id}#{suffix}"
+                ydoc[:metadata][:id] = "#{id}#{suffix}"
               end
 
               parsed << ydoc
@@ -152,12 +189,12 @@ class Store
     end
 
     all_things.each { |thing|
-      if thing["metadata"]["type"].start_with? "/entity" or
-        thing["metadata"]["type"].start_with? "/link"
+      if thing[:metadata][:type].start_with? "/entity" or
+        thing[:metadata][:type].start_with? "/link"
         all_entities << thing
-      elsif thing["metadata"]["type"].start_with? "/relation"
+      elsif thing[:metadata][:type].start_with? "/relation"
         all_relations << thing
-      elsif thing["metadata"]["type"].start_with? "/type"
+      elsif thing[:metadata][:type].start_with? "/type"
         all_types << thing
       else
         raise "Unknown type '#{thing["metadata"]["type"]}' for '#{thing["metadata"]["id"]}"
@@ -165,6 +202,8 @@ class Store
 
       load_progress.increment
     }
+
+    invalid_relations = []
 
     all_types.each { |thing|
       store.add!(thing)
@@ -178,9 +217,20 @@ class Store
       errors = store.validate(thing)
 
       if errors.any?
-        error_strings = []
+        formatted_errors = []
 
-        errors.each { |error| error_strings << error.to_s }
+        errors.each { |error|
+          if error.is_a? String
+            formatted_errors << { thing: error }
+          else
+            formatted_errors << error.to_h
+          end
+        }
+
+        invalid_relations << {
+          relation: thing,
+          errors: formatted_errors,
+        }
 
         $stderr.puts "Dropping invalid relation: #{thing} #{error_strings}"
       else
@@ -190,7 +240,7 @@ class Store
       load_progress.increment
     }
 
-    store
+    return store, invalid_relations
   end
 
   attr_reader :relations, :entities, :types
@@ -205,22 +255,22 @@ class Store
     @relations_by_entity_id = Hash.new { |h, k| h[k] = [] }
 
     base_type = Instance.new({
-      "metadata" => { "id" => "/type", "type" => "/type" },
-      "properties" => { }
+      metadata: { id: "/type", type: "/type" },
+      properties: { }
     })
 
     @types = [base_type]
     @types_by_id = { "/type" => base_type, "/link" => base_type }
   end
 
-  def add!(thing, validate: true)
+  def add!(thing, validate: false)
     instance = Instance.new(thing)
 
     raise "Invalid thing: #{thing}" if validate and not valid?(thing)
 
     @add_mutex.synchronize {
       if instance.type.start_with?("/entity")
-        $stderr.puts "Overwriting id #{id}" if @entities_by_id.has_key?(instance.id)
+        $stderr.puts "Overwriting id #{instance.id}: #{instance.to_h}" if @entities_by_id.has_key?(instance.id)
 
         @entities << instance
         @entities_by_id[instance.id] = instance
@@ -228,8 +278,8 @@ class Store
       elsif instance.type.start_with?("/relation")
         @relations << instance
         @relations_by_id[instance.id] = instance
-        @relations_by_entity_id[instance["a"]] << instance
-        @relations_by_entity_id[instance["b"]] << instance
+        @relations_by_entity_id[instance[:a]] << instance
+        @relations_by_entity_id[instance[:b]] << instance
       elsif instance.type.start_with?("/type")
         @types << instance
         @types_by_id[instance.id] = instance
@@ -261,13 +311,13 @@ class Store
     type_hierarchy = [type]
     curr_type = type
 
-    while parent_id = curr_type["parent"] and parent = @types_by_id[parent_id]
+    while parent_id = curr_type[:parent] and parent = @types_by_id[parent_id]
       type_hierarchy << parent
       curr_type = parent
     end
 
     merged_spec = type_hierarchy.reverse
-                    .map { |t| t["spec"] }
+                    .map { |t| t[:spec] }
                     .reduce({}, &:deep_merge)
 
     return [] if merged_spec.empty? and not instance.empty?
@@ -306,7 +356,7 @@ class Store
       return true if thing_type_id = type_id
 
       thing_type = @types_by_id[thing_type_id]
-      thing_type_id = thing_type["properties"]["parent"]
+      thing_type_id = thing_type[:properties][:parent]
     end while thing_type_id
 
     return false
@@ -321,7 +371,9 @@ class Store
   end
 
   def instance_or_id_to_id(instance)
-    if instance.is_a?(String)
+    if instance == nil
+      id = nil
+    elsif instance.is_a?(String)
       id = instance
     elsif instance.is_a?(Instance)
       id = instance.id
@@ -344,8 +396,8 @@ class Store
       to_traverse.each { |rel| seen.add(rel) }
 
       to_traverse = to_traverse.map { |rel|
-        a = rel["a"]
-        b = rel["b"]
+        a = rel[:a]
+        b = rel[:b]
 
         a_rels = @relations_by_entity_id[a]
         b_rels = @relations_by_entity_id[b]
@@ -357,19 +409,60 @@ class Store
     seen.to_a
   end
 
-  def resolve(instance)
-    e = @entities_by_id[instance_or_id_to_id(instance)]
-    if e and e.type.start_with? "/link"
-      resolve(e["link"])
-    elsif e and e.type.start_with? "/entity"
-      e
-    else
-      nil
+  def type_spec(type_id)
+    type = @types_by_id[type_id]
+    type_hierarchy = [type]
+    curr_type = type
+
+    while parent_id = curr_type[:parent] and parent = @types_by_id[parent_id]
+      type_hierarchy << parent
+      curr_type = parent
     end
+
+    type_hierarchy.reverse
+      .map { |t| t[:spec] }
+      .reduce({}, &:deep_merge)
   end
 
-  def entity_by_id(id)
-    @entitiy_by_id[id]
+  def resolve(relation)
+    rel_spec = type_spec(relation.type)
+
+    a_id = relation[:a]
+    a_entity = by_id(a_id)
+
+    if a_entity == nil
+      a_entity = Instance.new(
+        {
+          metadata: {
+            type: rel_spec[:a][:pointer_to],
+            id: a_id,
+          },
+          properties: {},
+        }
+      )
+    end
+
+    b_id = relation[:b]
+    b_entity = by_id(b_id)
+
+    if b_entity == nil
+      $stderr.puts "No pointer_to in: #{rel_spec}" if not rel_spec[:b].has_key?(:pointer_to)
+      b_entity = Instance.new(
+        {
+          metadata: {
+            type: rel_spec[:b][:pointer_to],
+            id: b_id,
+          },
+          properties: {},
+        }
+      )
+    end
+
+    return a_entity, b_entity
+  end
+
+  def by_id(id)
+    @entities_by_id[id]
   end
 
 end

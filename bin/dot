@@ -5,15 +5,36 @@ require 'set'
 
 require_relative "../lib/store.rb"
 
+PROGRESSBAR_SETTINGS = {format: '%t |%E | %B | %a', output: $stderr}
+
 if not ARGV.count > 1
-  $stderr.puts "dot path... root"
+  $stderr.puts "dot root path..."
   exit 1
 end
 
-root_id = ARGV[-1]
-directories = ARGV[0..-2]
+root_id = ARGV[0]
+paths = ARGV[1..-1]
 
-store = Store.from_directories(directories, progress: {format: '%t |%E | %B | %a', output: $stderr})
+directories = []
+files = []
+
+paths.each { |path|
+  if File.directory?(path)
+    directories << path
+  elsif File.file?(path)
+    files << path
+  else
+    $stderr.puts "Unknown path type: #{path}"
+  end
+}
+
+store, _ = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
+
+files.each { |file|
+  File.readlines(file).each { |thing|
+    store.add!(JSON.parse(thing, symbolize_names: true))
+  }
+}
 
 def node_id(entity)
   "a#{Digest::SHA1.hexdigest(entity.id)}"
@@ -21,9 +42,7 @@ end
 
 def dot(store, id)
   all_relations = store.all_relations_for(id)
-  all_pairs = all_relations.map { |rel|
-    [ store.resolve(rel["a"]), store.resolve(rel["b"]) ]
-  }
+  all_pairs = all_relations.map { |rel| store.resolve(rel) }
   all_entities = all_pairs.flatten.to_set
 
   out = []

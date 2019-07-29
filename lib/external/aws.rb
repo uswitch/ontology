@@ -50,10 +50,10 @@ def eip_entity(resource)
     }
   end
 
-  {
-    path: path,
-    entity: {
+  [
+    {
       metadata: {
+        id: path,
         type: "/entity/v1/ip_v4_address",
       },
       properties: {
@@ -61,8 +61,7 @@ def eip_entity(resource)
         address: resource["resourceName"],
       }
     },
-    relations: relations,
-  }
+  ] + add_ids_to(relations, base: path)
 end
 
 def instance_entity(resource)
@@ -70,19 +69,20 @@ def instance_entity(resource)
 
   # we should get the user data and then parse the containers that are run
 
-  {
-    path: path,
-    entity: {
+  relations = tag_relations(path, resource)
+
+  [
+    {
       metadata: {
+        id: path,
         type: "/entity/v1/computer",
       },
       properties: {
         provider: "aws",
         image: resource["configuration"]["imageId"],
       }
-    },
-    relations: tag_relations(path, resource),
-  }
+    }
+  ] + add_ids_to(relations, base: path)
 end
 
 def eni_entity(resource)
@@ -245,10 +245,8 @@ def eni_entity(resource)
     end
   end
 
-  {
-    path: path,
-    symlinks: symlinks,
-    entity: {
+  alias_entity(
+    {
       metadata: {
         type: "/entity/v1/network_interface",
       },
@@ -256,17 +254,20 @@ def eni_entity(resource)
         provider: "aws",
       }
     },
-    relations: relations,
-  }
+    id: path,
+    aliases: symlinks,
+  ) + add_ids_to(relations, base: path)
 end
 
 def nat_entity(resource)
   path = "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/nat/#{resource["resourceId"]}"
 
-  {
-    path: path,
-    entity: {
+  relations = tag_relations(path, resource)
+
+  [
+    {
       metadata: {
+        id: path,
         type: "/entity/v1/computer",
       },
       properties: {
@@ -274,8 +275,7 @@ def nat_entity(resource)
         image: "aws-nat",
       }
     },
-    relations: tag_relations(path, resource),
-  }
+  ] + add_ids_to(relations, base: path)
 end
 
 def lb_entity(resource)
@@ -297,10 +297,10 @@ def lb_entity(resource)
 
   relations = tag_relations(path, resource)
 
-  {
-    path: path,
-    entity: {
+  [
+    {
       metadata: {
+        id: path,
         type: "/entity/v1/load_balancer",
       },
       properties: {
@@ -308,8 +308,7 @@ def lb_entity(resource)
         scheme: resource["configuration"]["scheme"],
       }
     },
-    relations: relations,
-  }
+  ] + add_ids_to(relations, base: path)
 end
 
 def rds_instance_entity(resource)
@@ -332,10 +331,10 @@ def rds_instance_entity(resource)
 
   relations = tag_relations(path, resource) + net_relations
 
-  {
-    path: path,
-    entity: {
+  [
+    {
       metadata: {
+        id: path,
         type: "/entity/v1/computer",
       },
       properties: {
@@ -343,17 +342,16 @@ def rds_instance_entity(resource)
         image: "aws-rds",
       }
     },
-    relations: relations,
-  }
+  ] + add_ids_to(relations, base: path)
 end
 
 def lambda_entity(resource)
   path = "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/lambda/#{resource["resourceId"]}"
 
-  {
-    path: path,
-    entity: {
+  [
+    {
       metadata: {
+        id: path,
         type: "/entity/v1/computer",
       },
       properties: {
@@ -361,8 +359,7 @@ def lambda_entity(resource)
         image: "aws-lambda",
       }
     },
-    relations: tag_relations(path, resource),
-  }
+  ] + add_ids_to(tag_relations(path, resource), base: path)
 end
 
 
@@ -371,7 +368,7 @@ EFS_BANNED_REGIONS = [ "eu-north-1", "sa-east-1" ]
 class AWS
 
   def sync
-    sync_elasticsearch + sync_elasticache + sync_efs + sync_config
+    (sync_elasticsearch + sync_elasticache + sync_efs + sync_config).flatten
   end
 
   def account_id
@@ -396,10 +393,10 @@ class AWS
 
         path = "/computer/aws/#{account_id}/#{region}/elasticsearch/#{domain_name}"
 
-        {
-          path: path,
-          entity: {
+        [
+          {
             metadata: {
+              id: path,
               type: "/entity/v1/computer",
             },
             properties: {
@@ -407,7 +404,7 @@ class AWS
               image: "aws-elasticsearch",
             }
           },
-        }
+        ]
       }
     }.flatten
   end
@@ -418,10 +415,10 @@ class AWS
       client.describe_cache_clusters.cache_clusters.map { |cluster|
         path = "/computer/aws/#{account_id}/#{region}/elasticache/#{cluster.cache_cluster_id}"
 
-        {
-          path: path,
-          entity: {
+        [
+          {
             metadata: {
+              id: path,
               type: "/entity/v1/computer",
             },
             properties: {
@@ -429,7 +426,7 @@ class AWS
               image: "aws-elasticache",
             }
           },
-        }
+        ]
       }
     }.flatten
   end
@@ -440,10 +437,10 @@ class AWS
       client.describe_file_systems.file_systems.map { |fs|
         path = "/computer/aws/#{account_id}/#{region}/efs/#{fs.file_system_id}"
 
-        {
-          path: path,
-          entity: {
+        [
+          {
             metadata: {
+              id: path,
               type: "/entity/v1/computer",
             },
             properties: {
@@ -451,7 +448,7 @@ class AWS
               image: "aws-efs",
             }
           },
-        }
+        ]
       }
     }.flatten
   end

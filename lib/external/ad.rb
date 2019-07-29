@@ -2,6 +2,8 @@ require 'azure_graph_rbac'
 require 'json'
 require 'ms_rest'
 
+require_relative './utils.rb'
+
 class AD
 
   def sync
@@ -44,13 +46,8 @@ class AD
 
       path = "/person/#{domain}/#{user}"
 
-      {
-        path: path,
-        symlinks: [
-          "/person/by-email/#{upn}",
-          "/person/by-id/#{u["objectId"]}",
-        ],
-        entity: {
+      alias_entity(
+        {
           metadata: {
             type: "/entity/v1/person",
           },
@@ -59,8 +56,13 @@ class AD
             email: u["upn"],
           },
         },
-      }
-    }
+        id: path,
+        aliases: [
+          "/person/by-email/#{upn}",
+          "/person/by-id/#{u["objectId"]}"
+        ],
+      )
+    }.flatten
   end
 
 end

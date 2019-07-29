@@ -1,0 +1,9 @@
+metadata:
+  type: /entity/v1/service
+  id: /rvu/airship/provisioning
+---
+metadata:
+  type: /relation/v1/is_part_of
+properties:
+  a: /rvu/airship/provisioning
+  b: /rvu/airship

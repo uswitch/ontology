@@ -1,0 +1,15 @@
+metadata:
+  type: /entity/v1/service
+  id: /rvu/airship/observability/logging
+---
+metadata:
+  type: /relation/v1/is_part_of
+properties:
+  a: /rvu/airship/observability/logging
+  b: /rvu/airship/observability
+---
+metadata:
+  type: /relation/v1/is_classified_as
+properties:
+  a: /rvu/airship/observability/logging
+  b: /classification/sensitivity/restricted

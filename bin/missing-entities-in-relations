@@ -1,0 +1,51 @@
+#!/usr/bin/env ruby
+
+require_relative "../lib/store.rb"
+
+PROGRESSBAR_SETTINGS = {format: '%t |%E | %B | %a', output: $stderr}
+
+if not ARGV.count > 0
+  $stderr.puts "invalid_relations in_path..."
+  exit 1
+end
+
+paths = ARGV
+directories = []
+files = []
+
+paths.each { |path|
+  if File.directory?(path)
+    directories << path
+  elsif File.file?(path)
+    files << path
+  else
+    $stderr.puts "Unknown path type: #{path}"
+  end
+}
+
+store = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
+
+files.each { |file|
+  File.readlines(file).each { |thing|
+    store.add!(JSON.parse(thing, symbolize_names: true))
+  }
+}
+
+store.relations.each { |relation|
+  errors = store.validate(relation)
+
+  if errors.any?
+    errors.each { |err|
+      if err.has_key?("type") and err["type"] == :pointer_to
+        key = "unknown"
+        if relation[:a] == err["data"]
+          key = "a"
+        elsif relation[:b] == err["data"]
+          key = "b"
+        end
+
+        puts "#{relation.type}[#{key}]\t#{err["data"]}"
+      end
+    }
+  end
+}

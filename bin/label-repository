@@ -1,0 +1,53 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+require 'json'
+require 'yaml'
+
+dry_run = ARGV.any? { |arg| arg == '-d' or arg == '--dry-run' }
+help = ARGV.any? { |arg| arg == '--help' or arg == '-h' }
+args = ARGV.reject { |arg| arg[0] == '-' }
+
+if not args.count >= 2 or help
+  $stderr.puts "label-repository [relation] [id]..."
+  $stderr.puts
+  $stderr.puts "  -h/--help will show this"
+  $stderr.puts "  -d/--dry-run will not write"
+  $stderr.puts
+  $stderr.puts "This will add relation labels in the correct format"
+  $stderr.puts "It assumes that the repository is the CWD"
+
+  exit 1
+end
+
+METADATA_PATH = File.join('.github', 'metadata')
+
+label_key = args[0]
+label_values = args[1..-1]
+
+if File.exists?(METADATA_PATH)
+  doc = YAML.load(File.read(METADATA_PATH))
+else
+  doc = {}
+end
+
+doc["tags"] = {} if not doc.has_key?("tags")
+
+if doc["tags"].has_key?(label_key)
+  current_values = doc["tags"][label_key]
+else
+  current_values = []
+end
+
+new_values = (current_values + label_values).sort.uniq
+
+doc["tags"][label_key] = new_values
+
+yaml = YAML.dump(doc)
+
+if dry_run
+  puts yaml
+else
+  FileUtils.mkdir_p(File.dirname(METADATA_PATH))
+  File.write(METADATA_PATH, yaml)
+end

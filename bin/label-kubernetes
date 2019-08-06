@@ -1,0 +1,123 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'yaml'
+
+dry_run = ARGV.any? { |arg| arg == '-d' or arg == '--dry-run' }
+args = ARGV.reject { |arg| arg[0] == '-' }
+
+if not args.count >= 3 or ARGV.any? { |arg| arg == '--help' or arg == '-h' }
+  $stderr.puts "label-kubernetes [yaml] [relation] [id]..."
+  $stderr.puts
+  $stderr.puts "  -h/--help will show this"
+  $stderr.puts "  -d/--dry-run will not write"
+  $stderr.puts
+  $stderr.puts "This will add relation labels in the correct format"
+  $stderr.puts "  [yaml]: can be a glob string"
+
+  exit 1
+end
+
+def encode_values(values)
+  if values.length == 1
+    out = values[0]
+  else
+    out = JSON.dump(values)
+  end
+
+  #puts "#{values}[#{values.length}]: #{out}"
+
+  out
+end
+
+def decode_values(raw)
+  if raw[0] == "["
+    parsed = JSON.load(raw)
+  else
+    parsed = raw
+  end
+
+  if parsed.is_a?(String)
+    parsed = [parsed]
+  elsif not parsed.is_a?(Array)
+    raise "WAT"
+  end
+
+  parsed
+end
+
+def mutate_resource!(doc, key, values)
+  doc["metadata"] = {} if not doc.has_key?("metadata")
+  doc["metadata"]["annotations"] = {} if not doc["metadata"].has_key?("annotations") or doc["metadata"]["annotations"] == nil
+  annotations = doc["metadata"]["annotations"]
+
+  if annotations.has_key?(key)
+    # expand, combine and then write
+    current_values = decode_values(annotations[key])
+    new_values = (current_values + values).sort.uniq
+
+    annotations[key] = encode_values(new_values)
+  else
+    # just write
+    annotations[key] = encode_values(values)
+  end
+end
+
+yaml_glob = args[0]
+
+label_key = args[1]
+label_values = args[2..-1]
+
+raw_files = Dir.glob(yaml_glob)
+
+if raw_files.empty?
+  $stderr.puts "No files found for '#{yaml_glob}'"
+  exit 1
+end
+
+yaml_files = raw_files.reduce({}) { |out, yaml_file|
+  docs = []
+
+  File.open(yaml_file) { |fd|
+    begin
+      YAML.load_stream(fd) { |doc|
+        if doc.is_a?(Hash)
+          docs << doc
+        else
+          $stderr.puts "Doc in #{yaml_file} has no hash"
+        end
+      }
+    rescue Psych::SyntaxError
+      $stderr.puts "Failed to parse file: #{yaml_file}"
+    end
+  }
+
+  if docs.length > 0
+    out[yaml_file] = docs
+  end
+
+  out
+}
+
+yaml_files.each { |path, docs|
+  docs.each { |doc|
+    mutate_resource!(doc, label_key, label_values)
+
+    case doc["kind"]
+    when "Deployment"
+      mutate_resource!(doc["spec"]["template"], label_key, label_values)
+    when "CronJob"
+      mutate_resource!(doc["spec"]["jobTemplate"]["spec"]["template"], label_key, label_values)
+    when "DaemonSet"
+      mutate_resource!(doc["spec"]["template"], label_key, label_values)
+    when "StatefulSet"
+      mutate_resource!(doc["spec"]["template"], label_key, label_values)
+    end
+  }
+
+  if dry_run
+    puts YAML.dump_stream(*docs)
+  else
+    File.write(path, YAML.dump_stream(*docs))
+  end
+}

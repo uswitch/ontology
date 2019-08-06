@@ -37,21 +37,48 @@ them via pull requests to this repo, and the later loaded in via `./bin/sync`.
 We use labels/tags on entities defined outside of this repository in order to describe
 relations.
 
-These will
+There are utilities in `./bin` to label resources in the right way.
+
+The value of labels should either be a string, or an array of strings. Sometimes we are
+constrained by the schema of the data - looking at you, Kubernetes - so will have to represent
+an array using stringified JSON.
 
 ### Kubernetes labeling example
 
+TODO: We should amend the deployment plugin to add standard kube labels - I think I referenced
+them in an issue - for repo/ that this came from
+
 ```
-cloud.rvu.ontology/relation/v1/is_part_of: /rvu/mortgages/page-speed
-cloud.rvu.ontology/relation/v1/is_part_of: /rvu/mortgages/bankrate/front-end
+metadata:
+  labels:
+    cloud.rvu.ontology/relation/v1/is_part_of: '["/rvu/mortgages/page-speed", "/rvu/mortgages/bankrate/front-end"]'
 ```
 
 ### Github labeling example
 
+A file `/.github/metadata` should exist in the repository and look like the following:
+
 ```
-tags:
-  cloud.rvu.ontology/relation/v1/is_part_of: /rvu/platform/airship/logging
+metadata:
+  labels:
+    cloud.rvu.ontology/relation/v1/is_part_of:
+      - /rvu/airship/observability/logging
+      - /rvu/airship/provisioning
 ```
+
+### AWS labeling example
+
+Similar to Kubernetes we will need to encode JSON in the value in order to add multiple of the same kind
+of relation.
+
+TODO: We should and AWS Config rememdiation for every account we make to default the value of is_part_of to
+the team that owns the account. Maybe not, this might cause some issues when terraform runs and tries to remove the tags. Yay for a race between the two!
+
+
+### Docker container labeling example
+
+We look for some of the standard docker labels for which repository/commit it was built for and convert
+them into relations. Luckily Drone has been adding these labels onto containers for us.
 
 ## Output
 

@@ -34,7 +34,7 @@ class GitHub
       repo_h = repo.to_h
 
       begin
-        metadata_resp = client.contents(repo.full_name, path: ".rvu/metadata")
+        metadata_resp = client.contents(repo.full_name, path: ".github/metadata")
 
         repo_h[:metadata] = YAML.load(Base64.decode64(metadata_resp.content))
       rescue Octokit::NotFound

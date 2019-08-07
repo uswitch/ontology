@@ -45,12 +45,9 @@ an array using stringified JSON.
 
 ### Kubernetes labeling example
 
-TODO: We should amend the deployment plugin to add standard kube labels - I think I referenced
-them in an issue - for repo/ that this came from
-
 ```
 metadata:
-  labels:
+  annotations:
     cloud.rvu.ontology/relation/v1/is_part_of: '["/rvu/mortgages/page-speed", "/rvu/mortgages/bankrate/front-end"]'
 ```
 

@@ -63,7 +63,7 @@ class Kubernetes
           },
         },
       ] + (
-        labels_to_relations(id, node.metadata.labels.to_h)
+        labels_to_relations(id, node.metadata.annotations.to_h)
       )
 
       [
@@ -83,7 +83,7 @@ class Kubernetes
 
       relations = (
         owner_relations(id, server, cronjob.metadata) +
-        labels_to_relations(id, cronjob.metadata.labels.to_h)
+        labels_to_relations(id, cronjob.metadata.annotations.to_h)
       )
 
       [
@@ -103,7 +103,7 @@ class Kubernetes
 
       relations = (
         owner_relations(id, server, job.metadata) +
-        labels_to_relations(id, job.metadata.labels.to_h)
+        labels_to_relations(id, job.metadata.annotations.to_h)
       )
 
       [
@@ -123,7 +123,7 @@ class Kubernetes
 
       relations = (
         owner_relations(id, server, deployment.metadata) +
-        labels_to_relations(id, deployment.metadata.labels.to_h)
+        labels_to_relations(id, deployment.metadata.annotations.to_h)
       )
 
       [
@@ -143,7 +143,7 @@ class Kubernetes
 
       relations = (
         owner_relations(id, server, replica_set.metadata) +
-        labels_to_relations(id, replica_set.metadata.labels.to_h)
+        labels_to_relations(id, replica_set.metadata.annotations.to_h)
       )
 
       [
@@ -163,7 +163,7 @@ class Kubernetes
 
       relations = (
         owner_relations(id, server, daemon_set.metadata) +
-        labels_to_relations(id, daemon_set.metadata.labels.to_h)
+        labels_to_relations(id, daemon_set.metadata.annotations.to_h)
       )
 
       [
@@ -194,7 +194,7 @@ class Kubernetes
       ] + (
         container_relations(id, pod.spec.containers) +
         owner_relations(id, server, pod.metadata) +
-        labels_to_relations(id, pod.metadata.labels.to_h)
+        labels_to_relations(id, pod.metadata.annotations.to_h)
       )
 
       [

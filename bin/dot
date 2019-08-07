@@ -3,7 +3,7 @@
 require 'digest'
 require 'set'
 
-require_relative "../lib/store.rb"
+require_relative "../lib/ontology.rb"
 
 PROGRESSBAR_SETTINGS = {format: '%t |%E | %B | %a', output: $stderr}
 
@@ -15,26 +15,7 @@ end
 root_id = ARGV[0]
 paths = ARGV[1..-1]
 
-directories = []
-files = []
-
-paths.each { |path|
-  if File.directory?(path)
-    directories << path
-  elsif File.file?(path)
-    files << path
-  else
-    $stderr.puts "Unknown path type: #{path}"
-  end
-}
-
-store = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
-
-files.each { |file|
-  File.readlines(file).each { |thing|
-    store.add!(JSON.parse(thing, symbolize_names: true))
-  }
-}
+store = Ontology::CLI.store_from_paths(paths, progress: PROGRESSBAR_SETTINGS)
 
 def node_id(entity)
   "a#{Digest::SHA1.hexdigest(entity.id)}"

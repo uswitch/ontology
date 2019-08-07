@@ -391,142 +391,151 @@ end
 
 EFS_BANNED_REGIONS = [ "eu-north-1", "sa-east-1" ]
 
-class AWS
 
-  def sync
-    (sync_elasticsearch + sync_elasticache + sync_efs + sync_config).flatten
-  end
+module Ontology
 
-  def account_id
-    @account_id ||= begin
-                      client = Aws::STS::Client.new
-                      client.get_caller_identity.account
-                    end
-  end
+  module Source
 
-  def regions
-    @regions ||= begin
-                   client = Aws::EC2::Client.new
-                   client.describe_regions.regions.map { |r| r.region_name }
-                 end
-  end
+    class AWS
 
-  def sync_elasticsearch
-    updated_at = DateTime.now.rfc3339
+      def sync
+        (sync_elasticsearch + sync_elasticache + sync_efs + sync_config).flatten
+      end
 
-    regions.map { |region|
-      client = Aws::ElasticsearchService::Client.new(region: region)
-      client.list_domain_names.domain_names.map { |dn|
-        domain_name = dn[:domain_name]
+      def account_id
+        @account_id ||= begin
+                          client = Aws::STS::Client.new
+                          client.get_caller_identity.account
+                        end
+      end
 
-        path = "/computer/aws/#{account_id}/#{region}/elasticsearch/#{domain_name}"
+      def regions
+        @regions ||= begin
+                       client = Aws::EC2::Client.new
+                       client.describe_regions.regions.map { |r| r.region_name }
+                     end
+      end
 
-        [
-          {
-            metadata: {
-              id: path,
-              type: "/entity/v1/computer",
-              updated_at: updated_at,
-            },
-            properties: {
-              provider: "aws",
-              image: "aws-elasticsearch",
-            }
-          },
-        ]
-      }
-    }.flatten
-  end
+      def sync_elasticsearch
+        updated_at = DateTime.now.rfc3339
 
-  def sync_elasticache
-    updated_at = DateTime.now.rfc3339
+        regions.map { |region|
+          client = Aws::ElasticsearchService::Client.new(region: region)
+          client.list_domain_names.domain_names.map { |dn|
+            domain_name = dn[:domain_name]
 
-    regions.map { |region|
-      client = Aws::ElastiCache::Client.new(region: region)
-      client.describe_cache_clusters.cache_clusters.map { |cluster|
-        path = "/computer/aws/#{account_id}/#{region}/elasticache/#{cluster.cache_cluster_id}"
+            path = "/computer/aws/#{account_id}/#{region}/elasticsearch/#{domain_name}"
 
-        [
-          {
-            metadata: {
-              id: path,
-              type: "/entity/v1/computer",
-              updated_at: updated_at,
-            },
-            properties: {
-              provider: "aws",
-              image: "aws-elasticache",
-            }
-          },
-        ]
-      }
-    }.flatten
-  end
+            [
+              {
+                metadata: {
+                  id: path,
+                  type: "/entity/v1/computer",
+                  updated_at: updated_at,
+                },
+                properties: {
+                  provider: "aws",
+                  image: "aws-elasticsearch",
+                }
+              },
+            ]
+          }
+        }.flatten
+      end
 
-  def sync_efs
-    updated_at = DateTime.now.rfc3339
+      def sync_elasticache
+        updated_at = DateTime.now.rfc3339
 
-    regions.reject { |r| EFS_BANNED_REGIONS.include? r }.map { |region|
-      client = Aws::EFS::Client.new(region: region)
-      client.describe_file_systems.file_systems.map { |fs|
-        path = "/computer/aws/#{account_id}/#{region}/efs/#{fs.file_system_id}"
+        regions.map { |region|
+          client = Aws::ElastiCache::Client.new(region: region)
+          client.describe_cache_clusters.cache_clusters.map { |cluster|
+            path = "/computer/aws/#{account_id}/#{region}/elasticache/#{cluster.cache_cluster_id}"
 
-        [
-          {
-            metadata: {
-              id: path,
-              type: "/entity/v1/computer",
-              updated_at: updated_at,
-            },
-            properties: {
-              provider: "aws",
-              image: "aws-efs",
-            }
-          },
-        ]
-      }
-    }.flatten
-  end
+            [
+              {
+                metadata: {
+                  id: path,
+                  type: "/entity/v1/computer",
+                  updated_at: updated_at,
+                },
+                properties: {
+                  provider: "aws",
+                  image: "aws-elasticache",
+                }
+              },
+            ]
+          }
+        }.flatten
+      end
 
-  def sync_config
-    client = Aws::ConfigService::Client.new
-    type_conversion = {
-      "AWS::EC2::EIP" => method(:eip_entity),
-      "AWS::EC2::Instance" => method(:instance_entity),
-      "AWS::EC2::NatGateway" => method(:nat_entity),
-      "AWS::EC2::NetworkInterface" => method(:eni_entity),
-      "AWS::ElasticLoadBalancing::LoadBalancer" => method(:lb_entity),
-      "AWS::ElasticLoadBalancingV2::LoadBalancer" => method(:lb_entity),
-      "AWS::RDS::DBInstance" => method(:rds_instance_entity),
-      "AWS::Lambda::Function" => method(:lambda_entity),
-    }
+      def sync_efs
+        updated_at = DateTime.now.rfc3339
 
-    next_token = nil
-    all_resources = []
-    begin
-      resources, next_token = find_resources(client, type_conversion.keys, next_token)
-      all_resources = all_resources + resources
-    end while next_token != "" && next_token != nil
+        regions.reject { |r| EFS_BANNED_REGIONS.include? r }.map { |region|
+          client = Aws::EFS::Client.new(region: region)
+          client.describe_file_systems.file_systems.map { |fs|
+            path = "/computer/aws/#{account_id}/#{region}/efs/#{fs.file_system_id}"
 
-    all_resources.map { |resource|
-      type_conversion[resource["resourceType"]].(resource)
-    }
-  end
+            [
+              {
+                metadata: {
+                  id: path,
+                  type: "/entity/v1/computer",
+                  updated_at: updated_at,
+                },
+                properties: {
+                  provider: "aws",
+                  image: "aws-efs",
+                }
+              },
+            ]
+          }
+        }.flatten
+      end
 
-  def find_resources(client, types=[], next_token=nil)
-    query = "SELECT *, configuration, tags"
+      def sync_config
+        client = Aws::ConfigService::Client.new
+        type_conversion = {
+          "AWS::EC2::EIP" => method(:eip_entity),
+          "AWS::EC2::Instance" => method(:instance_entity),
+          "AWS::EC2::NatGateway" => method(:nat_entity),
+          "AWS::EC2::NetworkInterface" => method(:eni_entity),
+          "AWS::ElasticLoadBalancing::LoadBalancer" => method(:lb_entity),
+          "AWS::ElasticLoadBalancingV2::LoadBalancer" => method(:lb_entity),
+          "AWS::RDS::DBInstance" => method(:rds_instance_entity),
+          "AWS::Lambda::Function" => method(:lambda_entity),
+        }
 
-    if types.count > 0
-      filter = types.map { |type| "resourceType = '#{type}'" }.join(' OR ')
-      query += " WHERE " + filter
+        next_token = nil
+        all_resources = []
+        begin
+          resources, next_token = find_resources(client, type_conversion.keys, next_token)
+          all_resources = all_resources + resources
+        end while next_token != "" && next_token != nil
+
+        all_resources.map { |resource|
+          type_conversion[resource["resourceType"]].(resource)
+        }
+      end
+
+      def find_resources(client, types=[], next_token=nil)
+        query = "SELECT *, configuration, tags"
+
+        if types.count > 0
+          filter = types.map { |type| "resourceType = '#{type}'" }.join(' OR ')
+          query += " WHERE " + filter
+        end
+
+        resp = client.select_resource_config(
+          expression: query,
+          next_token: next_token,
+          limit: 100,
+        )
+        return resp[:results].map { |r| JSON.parse(r) }, resp[:next_token]
+      end
+
     end
 
-    resp = client.select_resource_config(
-      expression: query,
-      next_token: next_token,
-      limit: 100,
-    )
-    return resp[:results].map { |r| JSON.parse(r) }, resp[:next_token]
   end
 
 end

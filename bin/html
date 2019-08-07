@@ -5,7 +5,7 @@ require 'json'
 require 'mustache'
 require 'ruby-progressbar'
 
-require_relative "../lib/store.rb"
+require_relative "../lib/ontology.rb"
 
 PROGRESSBAR_SETTINGS = {format: '%t |%E | %B | %a', output: $stderr}
 
@@ -17,32 +17,9 @@ end
 out_directory = ARGV[0]
 paths = ARGV[1..-1]
 
-directories = []
-files = []
-
-paths.each { |path|
-  if File.directory?(path)
-    directories << path
-  elsif File.file?(path)
-    files << path
-  else
-    $stderr.puts "Unknown path type: #{path}"
-  end
-}
-
-store = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
-
-files.each { |file|
-  $stderr.puts "Loading #{file}"
-  File.readlines(file).each { |thing|
-    parsed_thing = JSON.parse(thing, symbolize_names: true)
-    $stderr.puts "Problem in #{file} #{parsed_thing}" if not parsed_thing.has_key?(:metadata)
-    store.add!(parsed_thing)
-  }
-}
+store = Ontology::CLI.store_from_paths(paths, progress: PROGRESSBAR_SETTINGS)
 
 FileUtils.mkdir_p(out_directory)
-
 
 def relation_html(store, relation, entity: nil)
   a, b = store.resolve(relation)
@@ -84,14 +61,22 @@ store.entities.each { |entity|
   type = store.type_of(entity)
   relations = store.relations_for(entity)
 
+  relations_by_type = relations.reduce(Hash.new{ |h, k| h[k] = [] }) { |out, relation|
+    out[relation.type] << relation
+    out
+  }
+
   html = <<HTMLBLOCK
 <!doctype html>
 <h1>#{entity.name}</h1>
 <sub>#{type.name}</sub>
+<h2>Properties</h2>
+<pre>
+#{JSON.pretty_generate(entity.properties)}
+</pre>
 <h2>Relations</h2>
-<ul>
-#{relations.map { |r| "<li>#{relation_html(store, r, entity: entity)}</li>" }.join}
-</ul>
+#{relations_by_type.map { |type, relations| "<h3>#{type}</h3><ul>#{relations.map { |r| "<li>#{relation_html(store, r, entity: entity)}</li>" }.join}</ul>" }.join}
+<p>Updated at: #{entity.updated_at}</p>
 HTMLBLOCK
 
   path = File.join(out_directory, entity.id) + ".html"

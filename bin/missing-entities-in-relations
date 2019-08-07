@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require_relative "../lib/store.rb"
+require_relative "../lib/ontology.rb"
 
 PROGRESSBAR_SETTINGS = {format: '%t |%E | %B | %a', output: $stderr}
 
@@ -10,26 +10,8 @@ if not ARGV.count > 0
 end
 
 paths = ARGV
-directories = []
-files = []
 
-paths.each { |path|
-  if File.directory?(path)
-    directories << path
-  elsif File.file?(path)
-    files << path
-  else
-    $stderr.puts "Unknown path type: #{path}"
-  end
-}
-
-store = Store.from_directories(directories, progress: PROGRESSBAR_SETTINGS)
-
-files.each { |file|
-  File.readlines(file).each { |thing|
-    store.add!(JSON.parse(thing, symbolize_names: true))
-  }
-}
+store = Ontology::CLI.store_from_paths(paths, progress: PROGRESSBAR_SETTINGS)
 
 store.relations.each { |relation|
   errors = store.validate(relation)

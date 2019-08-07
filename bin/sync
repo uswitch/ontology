@@ -4,22 +4,15 @@ require "digest"
 require "parallel"
 require "ruby-progressbar"
 
-require_relative "../lib/store.rb"
-
-require_relative "../lib/external/ad.rb"
-require_relative "../lib/external/aws.rb"
-require_relative "../lib/external/docker.rb"
-require_relative "../lib/external/gcp.rb"
-require_relative "../lib/external/github.rb"
-require_relative "../lib/external/kubernetes.rb"
+require_relative "../lib/ontology.rb"
 
 providers = {
-  "ad" =>  AD.new,
-  "aws" => AWS.new,
-  "docker" => DockerRegistry.new,
+  "ad" =>  Ontology::Source::AD.new,
+  "aws" => Ontology::Source::AWS.new,
+  "docker" => Ontology::Source::DockerRegistry.new,
 #  GCP.new,
-  "github" => GitHub.new,
-  "kubernetes" => Kubernetes.new,
+  "github" => Ontology::Source::GitHub.new,
+  "kubernetes" => Ontology::Source::Kubernetes.new,
 }
 
 if not ARGV.count > 0

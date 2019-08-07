@@ -77,6 +77,7 @@ class DockerRegistry
           labels = labels_from(manifest)
           relations = []
 
+          updated_at = DateTime.now.rfc3339
 
           if labels.has_key?("org.label-schema.vcs-url")
             vcs_uri = URI(labels["org.label-schema.vcs-url"])
@@ -86,6 +87,7 @@ class DockerRegistry
             relations << {
               metadata: {
                 type: "/relation/v1/was_built_by",
+                updated_at: updated_at,
               },
               properties: {
                 a: path,
@@ -100,9 +102,13 @@ class DockerRegistry
             {
               metadata: {
                 type: "/entity/v1/container",
+                updated_at: updated_at,
               },
               properties: {
                 provider: "docker",
+                server: "registry.usw.co",
+                repository: repo,
+                digest: digest,
                 created_at: created_from(manifest),
               },
             },

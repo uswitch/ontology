@@ -6,7 +6,7 @@ require 'aws-sdk-efs'
 require 'json'
 require 'resolv'
 
-def tag_relations(a, resource)
+def tag_relations(a, updated_at, resource)
   resource["tags"].map { |tag|
     next if not tag["key"].start_with? TAG_PREFIX
 
@@ -26,12 +26,14 @@ end
 
 def eip_entity(resource)
   path = "/ip_v4_address/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{resource["resourceId"]}"
-  relations = tag_relations(path, resource)
+  updated_at = DateTime.iso8601(resource["configurationItemCaptureTime"]).rfc3339
+  relations = tag_relations(path, updated_at, resource)
 
   if resource["configuration"]["networkInterfaceId"]
     relations << {
       metadata: {
         type: "/relation/v1/is_part_of",
+        updated_at: updated_at,
       },
       properties: {
         a: path,
@@ -42,6 +44,7 @@ def eip_entity(resource)
     relations << {
       metadata: {
         type: "/relation/v1/is_part_of",
+        updated_at: updated_at,
       },
       properties: {
         a: path,
@@ -55,6 +58,7 @@ def eip_entity(resource)
       metadata: {
         id: path,
         type: "/entity/v1/ip_v4_address",
+        updated_at: updated_at,
       },
       properties: {
         provider: "aws",
@@ -66,16 +70,18 @@ end
 
 def instance_entity(resource)
   path = "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{resource["resourceId"]}"
+  updated_at = DateTime.iso8601(resource["configurationItemCaptureTime"]).rfc3339
 
   # we should get the user data and then parse the containers that are run
 
-  relations = tag_relations(path, resource)
+  relations = tag_relations(path, updated_at, resource)
 
   [
     {
       metadata: {
         id: path,
         type: "/entity/v1/computer",
+        updated_at: updated_at,
       },
       properties: {
         provider: "aws",
@@ -87,6 +93,7 @@ end
 
 def eni_entity(resource)
   path = "/network_interface/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{resource["resourceId"]}"
+  updated_at = DateTime.iso8601(resource["configurationItemCaptureTime"]).rfc3339
 
   ip_addresses = resource["configuration"]["privateIpAddresses"].map { |entry|
     entry["privateIpAddress"]
@@ -100,7 +107,7 @@ def eni_entity(resource)
     "/network_interface/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/by-ip/#{ip_address}"
   }
 
-  relations = tag_relations(path, resource)
+  relations = tag_relations(path, updated_at, resource)
   description = resource["configuration"]["description"]
 
   interface_type = resource["configuration"]["interfaceType"]
@@ -126,6 +133,7 @@ def eni_entity(resource)
       relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
+          updated_at: updated_at,
         },
         properties: {
           a: path,
@@ -138,6 +146,7 @@ def eni_entity(resource)
       relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
+          updated_at: updated_at,
         },
         properties: {
           a: path,
@@ -152,6 +161,7 @@ def eni_entity(resource)
       relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
+          updated_at: updated_at,
         },
         properties: {
           a: path,
@@ -164,6 +174,7 @@ def eni_entity(resource)
       relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
+          updated_at: updated_at,
         },
         properties: {
           a: path,
@@ -176,6 +187,7 @@ def eni_entity(resource)
       relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
+          updated_at: updated_at,
         },
         properties: {
           a: path,
@@ -188,6 +200,7 @@ def eni_entity(resource)
       relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
+          updated_at: updated_at,
         },
         properties: {
           a: path,
@@ -202,6 +215,7 @@ def eni_entity(resource)
       relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
+          updated_at: updated_at,
         },
         properties: {
           a: path,
@@ -214,6 +228,7 @@ def eni_entity(resource)
       relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
+          updated_at: updated_at,
         },
         properties: {
           a: path,
@@ -226,6 +241,7 @@ def eni_entity(resource)
       relations << {
         metadata: {
           type: "/relation/v1/is_part_of",
+          updated_at: updated_at,
         },
         properties: {
           a: path,
@@ -249,6 +265,7 @@ def eni_entity(resource)
     {
       metadata: {
         type: "/entity/v1/network_interface",
+        updated_at: updated_at,
       },
       properties: {
         provider: "aws",
@@ -261,14 +278,16 @@ end
 
 def nat_entity(resource)
   path = "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/nat/#{resource["resourceId"]}"
+  updated_at = DateTime.iso8601(resource["configurationItemCaptureTime"]).rfc3339
 
-  relations = tag_relations(path, resource)
+  relations = tag_relations(path, updated_at, resource)
 
   [
     {
       metadata: {
         id: path,
         type: "/entity/v1/computer",
+        updated_at: updated_at,
       },
       properties: {
         provider: "aws",
@@ -294,14 +313,16 @@ def lb_entity(resource)
 
   name = name_prefix + resource["resourceName"]
   path = "/load_balancer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{name}"
+  updated_at = DateTime.iso8601(resource["configurationItemCaptureTime"]).rfc3339
 
-  relations = tag_relations(path, resource)
+  relations = tag_relations(path, updated_at, resource)
 
   [
     {
       metadata: {
         id: path,
         type: "/entity/v1/load_balancer",
+        updated_at: updated_at,
       },
       properties: {
         provider: "aws",
@@ -313,6 +334,7 @@ end
 
 def rds_instance_entity(resource)
   path = "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/rds/#{resource["resourceName"]}"
+  updated_at = DateTime.iso8601(resource["configurationItemCaptureTime"]).rfc3339
 
   endpoint_dn = resource["configuration"]["endpoint"]["address"]
   endpoint_addresses = Resolv.getaddresses(endpoint_dn)
@@ -321,6 +343,7 @@ def rds_instance_entity(resource)
     {
       metadata: {
         type: "/relation/v1/is_part_of",
+        updated_at: updated_at,
       },
       properties: {
         a: "/network_interface/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/by-ip/#{address}",
@@ -329,13 +352,14 @@ def rds_instance_entity(resource)
     }
   }
 
-  relations = tag_relations(path, resource) + net_relations
+  relations = tag_relations(path, updated_at, resource) + net_relations
 
   [
     {
       metadata: {
         id: path,
         type: "/entity/v1/computer",
+        updated_at: updated_at,
       },
       properties: {
         provider: "aws",
@@ -347,19 +371,21 @@ end
 
 def lambda_entity(resource)
   path = "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/lambda/#{resource["resourceId"]}"
+  updated_at = DateTime.iso8601(resource["configurationItemCaptureTime"]).rfc3339
 
   [
     {
       metadata: {
         id: path,
         type: "/entity/v1/computer",
+        updated_at: updated_at,
       },
       properties: {
         provider: "aws",
         image: "aws-lambda",
       }
     },
-  ] + add_ids_to(tag_relations(path, resource), base: path)
+  ] + add_ids_to(tag_relations(path, updated_at, resource), base: path)
 end
 
 
@@ -386,6 +412,8 @@ class AWS
   end
 
   def sync_elasticsearch
+    updated_at = DateTime.now.rfc3339
+
     regions.map { |region|
       client = Aws::ElasticsearchService::Client.new(region: region)
       client.list_domain_names.domain_names.map { |dn|
@@ -398,6 +426,7 @@ class AWS
             metadata: {
               id: path,
               type: "/entity/v1/computer",
+              updated_at: updated_at,
             },
             properties: {
               provider: "aws",
@@ -410,6 +439,8 @@ class AWS
   end
 
   def sync_elasticache
+    updated_at = DateTime.now.rfc3339
+
     regions.map { |region|
       client = Aws::ElastiCache::Client.new(region: region)
       client.describe_cache_clusters.cache_clusters.map { |cluster|
@@ -420,6 +451,7 @@ class AWS
             metadata: {
               id: path,
               type: "/entity/v1/computer",
+              updated_at: updated_at,
             },
             properties: {
               provider: "aws",
@@ -432,6 +464,8 @@ class AWS
   end
 
   def sync_efs
+    updated_at = DateTime.now.rfc3339
+
     regions.reject { |r| EFS_BANNED_REGIONS.include? r }.map { |region|
       client = Aws::EFS::Client.new(region: region)
       client.describe_file_systems.file_systems.map { |fs|
@@ -442,6 +476,7 @@ class AWS
             metadata: {
               id: path,
               type: "/entity/v1/computer",
+              updated_at: updated_at,
             },
             properties: {
               provider: "aws",

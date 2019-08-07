@@ -1,5 +1,7 @@
 require 'digest'
 
+TAG_PREFIX="cloud.rvu.ontology"
+
 def clone_hash(hash)
   Marshal.load(Marshal.dump(hash))
 end
@@ -34,4 +36,22 @@ def add_ids_to(things, base:)
     thing[:metadata][:id] = "#{base}/#{i}"
     thing
   }
+end
+
+def labels_to_relations(entitiy_id, updated_at, labels)
+  labels.map { |tag, val|
+    next if not tag.to_s.start_with? TAG_PREFIX
+
+    type = tag[TAG_PREFIX.length..-1]
+
+    {
+      metadata: {
+        type: type,
+      },
+      properties: {
+        a: entitiy_id,
+        b: val,
+      },
+    }
+   }.compact
 end

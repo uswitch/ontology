@@ -2,8 +2,8 @@ require 'k8s-client'
 require 'uri'
 
 require_relative './docker.rb'
-
-def owner_relations(id, server, metadata)
+5
+def owner_relations(id, updated_at, server, metadata)
   if metadata.ownerReferences and metadata.ownerReferences.count > 0
     metadata.ownerReferences.map { |ref|
       {
@@ -22,7 +22,7 @@ def owner_relations(id, server, metadata)
   end
 end
 
-def container_relations(id, containers)
+def container_relations(id, updated_at, containers)
   containers.map { |container|
     parsed = parse_image_reference(container.image)
 
@@ -47,6 +47,7 @@ class Kubernetes
 
     nodes = client.api('v1').resource('nodes').list.map do |node|
       id = "/computer/kubernetes/#{server}/#{node.metadata.name}"
+      updated_at = DateTime.now.rfc3339
 
       providerId = node.spec.providerID.split("/")
       instanceId = providerId[-1]
@@ -56,6 +57,7 @@ class Kubernetes
         {
           metadata: {
             type: "/relation/v1/is_the_same_as",
+            updated_at: updated_at,
           },
           properties: {
             a: id,
@@ -63,7 +65,7 @@ class Kubernetes
           },
         },
       ] + (
-        labels_to_relations(id, node.metadata.annotations.to_h)
+        labels_to_relations(id, updated_at, node.metadata.annotations.to_h)
       )
 
       [
@@ -71,6 +73,7 @@ class Kubernetes
           metadata: {
             id: id,
             type: "/entity/v1/computer",
+            updated_at: updated_at,
           },
           properties: {
           },
@@ -80,10 +83,11 @@ class Kubernetes
 
     cronjobs = client.api('batch/v1beta1').resource('cronjobs').list.map do |cronjob|
       id = "/workload/kubernetes/#{server}/#{cronjob.metadata.namespace}/cronjobs/#{cronjob.metadata.name}"
+      updated_at = DateTime.now.rfc3339
 
       relations = (
-        owner_relations(id, server, cronjob.metadata) +
-        labels_to_relations(id, cronjob.metadata.annotations.to_h)
+        owner_relations(id, updated_at, server, cronjob.metadata) +
+        labels_to_relations(id, updated_at, cronjob.metadata.annotations.to_h)
       )
 
       [
@@ -91,6 +95,7 @@ class Kubernetes
           metadata: {
             id: id,
             type: "/entity/v1/computer",
+            updated_at: updated_at,
           },
           properties: {
           },
@@ -100,10 +105,11 @@ class Kubernetes
 
     jobs = client.api('batch/v1').resource('jobs').list.map do |job|
       id = "/workload/kubernetes/#{server}/#{job.metadata.namespace}/jobs/#{job.metadata.name}"
+      updated_at = DateTime.now.rfc3339
 
       relations = (
-        owner_relations(id, server, job.metadata) +
-        labels_to_relations(id, job.metadata.annotations.to_h)
+        owner_relations(id, updated_at, server, job.metadata) +
+        labels_to_relations(id, updated_at, job.metadata.annotations.to_h)
       )
 
       [
@@ -111,6 +117,7 @@ class Kubernetes
           metadata: {
             id: id,
             type: "/entity/v1/computer",
+            updated_at: updated_at,
           },
           properties: {
           },
@@ -120,10 +127,11 @@ class Kubernetes
 
     deployments = client.api('apps/v1').resource('deployments').list.map do |deployment|
       id = "/workload/kubernetes/#{server}/#{deployment.metadata.namespace}/deployment/#{deployment.metadata.name}"
+      updated_at = DateTime.now.rfc3339
 
       relations = (
-        owner_relations(id, server, deployment.metadata) +
-        labels_to_relations(id, deployment.metadata.annotations.to_h)
+        owner_relations(id, updated_at, server, deployment.metadata) +
+        labels_to_relations(id, updated_at, deployment.metadata.annotations.to_h)
       )
 
       [
@@ -131,6 +139,7 @@ class Kubernetes
           metadata: {
             id: id,
             type: "/entity/v1/computer",
+            updated_at: updated_at,
           },
           properties: {
           },
@@ -140,10 +149,11 @@ class Kubernetes
 
     replica_sets = client.api('apps/v1').resource('replicasets').list.map do |replica_set|
       id = "/workload/kubernetes/#{server}/#{replica_set.metadata.namespace}/replicaset/#{replica_set.metadata.name}"
+      updated_at = DateTime.now.rfc3339
 
       relations = (
-        owner_relations(id, server, replica_set.metadata) +
-        labels_to_relations(id, replica_set.metadata.annotations.to_h)
+        owner_relations(id, updated_at, server, replica_set.metadata) +
+        labels_to_relations(id, updated_at, replica_set.metadata.annotations.to_h)
       )
 
       [
@@ -151,6 +161,7 @@ class Kubernetes
           metadata: {
             id: id,
             type: "/entity/v1/computer",
+            updated_at: updated_at,
           },
           properties: {
           },
@@ -160,10 +171,11 @@ class Kubernetes
 
     daemon_sets = client.api('apps/v1').resource('daemonsets').list.map do |daemon_set|
       id = "/workload/kubernetes/#{server}/#{daemon_set.metadata.namespace}/daemonset/#{daemon_set.metadata.name}"
+      updated_at = DateTime.now.rfc3339
 
       relations = (
-        owner_relations(id, server, daemon_set.metadata) +
-        labels_to_relations(id, daemon_set.metadata.annotations.to_h)
+        owner_relations(id, updated_at, server, daemon_set.metadata) +
+        labels_to_relations(id, updated_at, daemon_set.metadata.annotations.to_h)
       )
 
       [
@@ -171,6 +183,7 @@ class Kubernetes
           metadata: {
             id: id,
             type: "/entity/v1/computer",
+            updated_at: updated_at,
           },
           properties: {
           },
@@ -180,11 +193,13 @@ class Kubernetes
 
     pods = client.api('v1').resource('pods').list.map do |pod|
       id = "/workload/kubernetes/#{server}/#{pod.metadata.namespace}/pod/#{pod.metadata.name}"
+      updated_at = DateTime.now.rfc3339
 
       relations = [
         {
           metadata: {
             type: "/relation/v1/is_running_on",
+            updated_at: updated_at,
           },
           properties: {
             a: id,
@@ -192,9 +207,9 @@ class Kubernetes
           },
         },
       ] + (
-        container_relations(id, pod.spec.containers) +
-        owner_relations(id, server, pod.metadata) +
-        labels_to_relations(id, pod.metadata.annotations.to_h)
+        container_relations(id, updated_at, pod.spec.containers) +
+        owner_relations(id, updated_at, server, pod.metadata) +
+        labels_to_relations(id, updated_at, pod.metadata.annotations.to_h)
       )
 
       [
@@ -202,6 +217,7 @@ class Kubernetes
           metadata: {
             id: id,
             type: "/entity/v1/computer",
+            updated_at: updated_at,
           },
           properties: {
           },

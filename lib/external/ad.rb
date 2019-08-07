@@ -25,6 +25,8 @@ class AD
     path = "/#{client.tenant_id}/users"
     users = []
 
+    updated_at = DateTime.now.rfc3339
+
     while path do
       result = client.make_request(:get, path, { query_params: {'api-version' => '1.6'} })
 
@@ -50,6 +52,7 @@ class AD
         {
           metadata: {
             type: "/entity/v1/person",
+            updated_at: updated_at,
           },
           properties: {
             id: u["objectId"],

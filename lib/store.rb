@@ -43,12 +43,33 @@ class Instance
     if not @h.has_key?(:properties)
       @h[:properties] = {}
     end
+
+    if not @h[:metadata].has_key?(:name)
+      @h[:metadata][:name] = id.split("/")[-1]
+    end
+
+    if not @h[:metadata].has_key?(:updated_at)
+      @h[:metadata][:updated_at] = DateTime.now.rfc3339
+    end
+
+    raise "Invalid instance #{h}" if not valid?
   end
 
   def valid?
-    not (@h.has_key?(:metadata) and
-         @h[:metadata].has_key?(:id) and
-         @h[:metadata].has_key?(:type))
+    return false if not (@h.has_key?(:metadata) and
+                         @h[:metadata].has_key?(:id) and
+                         @h[:metadata].has_key?(:type) and
+                         @h[:metadata].has_key?(:name) and
+                         @h[:metadata].has_key?(:updated_at))
+
+    # and updated_at is in RFC3339 format
+    begin
+      updated_at = DateTime.rfc3339(@h[:metadata][:updated_at])
+    rescue ArgumentError
+      return false
+    end
+
+    return true
   end
 
   def id
@@ -66,6 +87,10 @@ class Instance
   def type
     $stderr.puts @h if not @h.has_key?(:metadata)
     @h[:metadata][:type]
+  end
+
+  def updated_at
+    @h[:metadata][:updated_at]
   end
 
   def properties
@@ -122,6 +147,8 @@ class Store
 
         id = "/#{dirname}#{File.basename(file, ".*")}"
 
+        mtime = File.stat(path).mtime.to_datetime.rfc3339
+
         if File.symlink?(path)
           link = File.readlink(path)
           if not link.start_with?(base)
@@ -149,6 +176,10 @@ class Store
           if not parsed[:metadata].has_key?(:id)
             parsed[:metadata][:id] = id
           end
+
+          if not parsed[:metadata].has_key?(:updated_at)
+            parsed[:metadata][:updated_at] = mtime
+          end
         elsif File.extname(file) == ".yaml"
           parsed = []
           File.open( path ) do |yf|
@@ -163,6 +194,10 @@ class Store
                   suffix = "/#{idx}"
                 end
                 ydoc[:metadata][:id] = "#{id}#{suffix}"
+              end
+
+              if not ydoc[:metadata].has_key?(:updated_at)
+                ydoc[:metadata][:updated_at] = mtime
               end
 
               parsed << ydoc
@@ -209,7 +244,7 @@ class Store
     })
 
     @types = [base_type]
-    @types_by_id = { "/type" => base_type, "/link" => base_type }
+    @types_by_id = { "/type" => base_type }
   end
 
   def add!(thing, validate: false)

@@ -77,6 +77,114 @@ the team that owns the account. Maybe not, this might cause some issues when ter
 We look for some of the standard docker labels for which repository/commit it was built for and convert
 them into relations. Luckily Drone has been adding these labels onto containers for us.
 
+## Types
+
+We, unsuprisingly, have the notion of types of things, be it a relation or an entity. The type system is a
+simple hierarchical system, with single parents. This allows us to create some constraints around what
+things are related and expected properties of relations and entities.
+
+We express the constraints on properties using JSON schema.
+
+We've added one extension to JSON Schema, which is the `pointer_to` keyword. This is used in relations
+to constrain the entities that can be related. This relies on the type hierarchy.
+
+These types aren't defined externally of Ontology.
+
+### Internal entities
+
+We need a type to define what is expected of a type
+
+  - `/type`
+    A `/type` requires the entity to define a spec property which contains the constraints on properties
+    of any instantiations of the type. Optionally, you can also define a `parent` property that lets you
+    build up a hierarchy.
+
+### Internal relations [Currently unimplemnted]
+
+These are required to map the YAML metadata into relations.
+
+  - `/relation/v1/is_a` -> `.metadata.type`
+  - `/relation/v1/is_named` -> `.metedata.name`
+  - `/relation/v1/was_updated_at` -> `.metadata.update_at`
+
+### Required metadata
+
+  - `type`: References an entity that is derived from `/type`
+  - `id`: Any unique string identifier
+  - `name`: A more human identifier for the entity
+  - `updated_at`[Current implemented]: An ISO8601 formated string that contains when the information
+    contained in the entity is from.
+
+## Ingesting data
+
+As set out in the requirements Ontology revolves around a combination of static, slow moving entities and
+dynamic, more quickly changing entities.
+
+We support loading entities and relations from the file system in two formats: JSON files organised in a
+folder heirarchy, or as files containing many JSON objects separated by new lines. These two formats are
+supported when initially starting up the application and are used to preload the types, static entities and
+potentially, initial snapshots of dynamic entities.
+
+Once Ontology is started it will expose an HTTP API to allow the creation and mutation of entities.
+
+The truth of Ontology is a product of the data put into it. It is important to ensure that only the systems
+that are expect to be mutating entities and relations are the ones that do. If we ever want to use it to
+make security decisions this is important.
+
+**Authnz + Auditing**. This could be combined with something like the Certificate Transparency backing store.
+It provides a tamper proof log of things it's been told
+
+### Sync agents
+
+We've written a set of agents to aggregate data from external systems:
+  - AWS,
+  - GitHub,
+  - Docker Registry v2,
+  - Kubernetes,
+  - Azure AD.
+
+### Formats
+
+We started with a single format, but this might be splintering into the two views of the same data.
+
+We wanted schema for the data that is stored against entities so we have the concept of types. These build up
+a JSON schema object that can be used to validate an entity.
+
+#### YAML
+
+I can't think of the right name for this. It is the complete definition of an entity or relation in one blob.
+This looks a lot like a Kubernetes resource, as this has influenced my thinking a bunch of late.
+
+```
+metadata:
+  type: /entity/v1/thing
+  id: /things/wibble
+properties:
+  thinginess: 7
+```
+
+The only required fields a `.metadata.type` and `.metadata.id`. The fields `.metadata.updated_at` and
+`.metadata.name` will always be available, but if not provided will be derived by Ontology.
+
+
+#### EAV (Entity-attribute-value) [Current unimplemented]
+
+Break up the data into triples.
+
+This might end up being mostly an internal format. This is how Cayley et al store there graph data.
+
+```
+( id             , attribute                   , value )
+( /things/wibble , /relation/v1/is_a           , /entity/v1/thing )
+( /things/wibble , /entity/v1/thing#thinginess , 7 )
+```
+
+The `( id , is_a , type)` would be the only required triple, as in the YAML format above. There
+might be other expected triples based on the type of the entity.
+
+Properties of both entities and relations will be represented by the type followed by `#` and then
+the path of the property. In the above example, `thinginess` is a property of `/entity/v1/thing`.
+
 ## Output
 
 Mustache templates used as they do not limit us to Ruby, which is mostly a language to prototype this in.

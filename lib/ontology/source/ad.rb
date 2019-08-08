@@ -4,7 +4,7 @@ require 'ms_rest'
 
 require_relative './utils.rb'
 
-module Onology
+module Ontology
 
   module Source
 

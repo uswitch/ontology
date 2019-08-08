@@ -7,32 +7,29 @@ require "ruby-progressbar"
 require_relative "../lib/ontology.rb"
 
 providers = {
-  "ad" =>  Ontology::Source::AD.new,
-  "aws" => Ontology::Source::AWS.new,
-  "docker" => Ontology::Source::DockerRegistry.new,
-#  GCP.new,
-  "github" => Ontology::Source::GitHub.new,
-  "kubernetes" => Ontology::Source::Kubernetes.new,
+  "ad" =>  Ontology::Source::AD,
+  "aws" => Ontology::Source::AWS,
+  "directory" => Ontology::Source::Directory,
+  "docker" => Ontology::Source::DockerRegistry,
+  "github" => Ontology::Source::GitHub,
+  "kubernetes" => Ontology::Source::Kubernetes,
 }
 
 if not ARGV.count > 0
-  $stderr.puts "sync provider..."
+  $stderr.puts "sync provider args..."
   $stderr.puts "providers: #{providers.keys}"
   exit 1
 end
 
-to_sync = ARGV.map { |name|
-  if not providers.has_key?(name)
-    $stderr.puts "invalid provider '#{name}'"
-    $stderr.puts "providers: #{providers.keys}"
-    exit 1
-  end
+name = ARGV[0]
+args = ARGV[1..-1]
 
-  providers[name]
-}
+if not providers.has_key?(name)
+  $stderr.puts "invalid provider '#{name}'"
+  $stderr.puts "providers: #{providers.keys}"
+  exit 1
+end
 
-Parallel.each(to_sync) { |source|
-  source.sync.each { |thing|
-    puts JSON.dump(thing)
-  }
+providers[name].new(*args).sync.each { |thing|
+  puts JSON.dump(thing)
 }

@@ -50,8 +50,6 @@ module Ontology
         elsif instance.type.start_with?("/type")
           @types << instance
           @types_by_id[instance.id] = instance
-        elsif instance.type.start_with?("/link")
-          @entities_by_id[instance.id] = instance
         else
           $stderr.puts "Unknown type: #{type}"
         end

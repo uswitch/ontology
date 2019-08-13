@@ -4,17 +4,27 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 )
 
 func main() {
-
 	var serverWaitGroup sync.WaitGroup
+
+	if len(os.Args) != 2 {
+		log.Fatal("http-api [config path]")
+	}
+
+	configPath := os.Args[1]
+	config, err := ConfigFromPath(configPath)
+	if err != nil {
+		log.Fatalf("Could load config file from '%s': %v", configPath, err)
+	}
 
 	apiMux := http.NewServeMux()
 
 	apiServer := &http.Server{
-		Addr:    "127.0.0.1:8080",
+		Addr:    config.ApiAddr,
 		Handler: apiMux,
 	}
 
@@ -35,7 +45,7 @@ func main() {
 	})
 
 	opsServer := &http.Server{
-		Addr:    "127.0.0.1:8081",
+		Addr:    config.OpsAddr,
 		Handler: opsMux,
 	}
 

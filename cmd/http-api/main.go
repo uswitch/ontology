@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,14 +19,19 @@ func main() {
 	configPath := os.Args[1]
 	config, err := ConfigFromPath(configPath)
 	if err != nil {
-		log.Fatalf("Could load config file from '%s': %v", configPath, err)
+		log.Fatalf("Couldn't load config file from '%s': %v", configPath, err)
+	}
+
+	oidcAuth, err := NewOIDCAuthenticator(context.Background(), config.Providers)
+	if err != nil {
+		log.Fatalf("Couldn't load OIDC providers: %v", err)
 	}
 
 	apiMux := http.NewServeMux()
 
 	apiServer := &http.Server{
 		Addr:    config.ApiAddr,
-		Handler: apiMux,
+		Handler: oidcAuth.Middleware(apiMux),
 	}
 
 	serverWaitGroup.Add(1)

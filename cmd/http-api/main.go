@@ -27,11 +27,13 @@ func main() {
 		log.Fatalf("Couldn't load OIDC providers: %v", err)
 	}
 
+	auditLogger := log.New(os.Stderr, "audit\t", 0)
+
 	apiMux := http.NewServeMux()
 
 	apiServer := &http.Server{
 		Addr:    config.ApiAddr,
-		Handler: oidcAuth.Middleware(apiMux),
+		Handler: oidcAuth.Middleware(AuditMiddleware(auditLogger, apiMux)),
 	}
 
 	serverWaitGroup.Add(1)

@@ -22,7 +22,7 @@ func TestOIDCHappyPath(t *testing.T) {
 		t.Fatalf("Couldn't create provider and token: %v", err)
 	}
 
-	response, user := doMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token))
+	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token))
 
 	if response.StatusCode != 200 {
 		t.Errorf("%d expected but got %d", 200, response.StatusCode)
@@ -44,7 +44,7 @@ func TestOIDCTwoProviders(t *testing.T) {
 		t.Fatalf("Couldn't create provider2 and token: %v", err)
 	}
 
-	response, user := doMiddleware(t, []OIDCConfig{providerConfig1, providerConfig2}, fmt.Sprintf("Bearer %s", token))
+	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig1, providerConfig2}, fmt.Sprintf("Bearer %s", token))
 
 	if response.StatusCode != 200 {
 		t.Errorf("%d expected but got %d", 200, response.StatusCode)
@@ -56,7 +56,7 @@ func TestOIDCTwoProviders(t *testing.T) {
 }
 
 func TestOIDCNoAuthHeader(t *testing.T) {
-	response, _ := doMiddleware(t, []OIDCConfig{}, "")
+	response, _ := doOIDCMiddleware(t, []OIDCConfig{}, "")
 
 	if response.StatusCode != 401 {
 		t.Errorf("%d expected but got %d", 401, response.StatusCode)
@@ -72,7 +72,7 @@ func TestOIDCAuthHeaderMalformed(t *testing.T) {
 	}
 
 	for _, header := range headers {
-		response, _ := doMiddleware(t, []OIDCConfig{}, header)
+		response, _ := doOIDCMiddleware(t, []OIDCConfig{}, header)
 
 		if response.StatusCode != 401 {
 			t.Errorf("%d expected but got %d", 401, response.StatusCode)
@@ -91,7 +91,7 @@ func TestOIDCNoVerifiedProvider(t *testing.T) {
 		t.Fatalf("Couldn't create provider2 and token: %v", err)
 	}
 
-	response, user := doMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token))
+	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token))
 
 	if response.StatusCode != 401 {
 		t.Errorf("%d expected but got %d", 401, response.StatusCode)
@@ -109,7 +109,7 @@ func TestOIDCNoMatchingUserClaim(t *testing.T) {
 		t.Fatalf("Couldn't create provider1 and token: %v", err)
 	}
 
-	response, user := doMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token))
+	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token))
 
 	if response.StatusCode != 500 {
 		t.Errorf("%d expected but got %d", 500, response.StatusCode)
@@ -173,7 +173,7 @@ func oidcTestHandler(out *string) http.Handler {
 	})
 }
 
-func doMiddleware(t *testing.T, config []OIDCConfig, authorizationHeader string) (*http.Response, string) {
+func doOIDCMiddleware(t *testing.T, config []OIDCConfig, authorizationHeader string) (*http.Response, string) {
 	authenticator, err := NewOIDCAuthenticator(context.Background(), config)
 	if err != nil {
 		t.Fatalf("Couldn't create the authenticator: %v", err)

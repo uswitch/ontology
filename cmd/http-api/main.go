@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -34,7 +36,7 @@ func opsHandler(config *Config) (http.Handler, error) {
 	return opsMux, nil
 }
 
-func startServerInGroup(wg *sync.WaitGroup, name string, handler http.Handler, config ServerConfig) *http.Server {
+func startServer(name string, handler http.Handler, config ServerConfig) *http.Server {
 	server := &http.Server{
 		Addr:    config.Addr,
 		Handler: handler,
@@ -44,11 +46,7 @@ func startServerInGroup(wg *sync.WaitGroup, name string, handler http.Handler, c
 		IdleTimeout:  time.Second * time.Duration(config.IdleTimeoutSecs),
 	}
 
-	wg.Add(1)
-
 	go func() {
-		defer wg.Done()
-
 		log.Printf(
 			"%s server listening on %v. timeouts: [w %v, r %v, i %v]",
 			name,
@@ -57,15 +55,21 @@ func startServerInGroup(wg *sync.WaitGroup, name string, handler http.Handler, c
 			server.ReadTimeout,
 			server.IdleTimeout,
 		)
-		log.Println(server.ListenAndServe())
+
+		err := server.ListenAndServe()
+
+		switch err {
+		case http.ErrServerClosed:
+			log.Printf("%s server has shutdown", name)
+		default:
+			log.Fatalf("%s server failed: %v", name, err)
+		}
 	}()
 
 	return server
 }
 
 func main() {
-	var serverWaitGroup sync.WaitGroup
-
 	if len(os.Args) != 2 {
 		log.Fatal("http-api [config path]")
 	}
@@ -76,18 +80,47 @@ func main() {
 		log.Fatalf("Couldn't load config file from '%s': %v", configPath, err)
 	}
 
+	var apiServer, opsServer *http.Server
+
 	if api, err := apiHandler(config); err != nil {
 		log.Fatal(err)
 	} else {
-		startServerInGroup(&serverWaitGroup, "api", api, config.Api)
+		apiServer = startServer("api", api, config.Api)
 	}
 
 	if ops, err := opsHandler(config); err != nil {
 		log.Fatal(err)
 	} else {
-		startServerInGroup(&serverWaitGroup, "ops", ops, config.Ops)
+		opsServer = startServer("ops", ops, config.Ops)
 	}
 
-	serverWaitGroup.Wait()
+	gracefulTimeout := time.Second * time.Duration(config.GracefulTimeoutSecs)
+	gracefulShutdownSignals := make(chan os.Signal, 1)
 
+	signal.Notify(gracefulShutdownSignals, syscall.SIGINT, syscall.SIGTERM)
+
+	<-gracefulShutdownSignals
+
+	log.Printf("graceful shutdown triggered, waiting for %v for servers to shutdown", gracefulTimeout)
+
+	wg := sync.WaitGroup{}
+	shutdownDone := make(chan struct{})
+
+	wg.Add(2)
+	go func() { wg.Wait(); close(shutdownDone) }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), gracefulTimeout)
+	defer cancel()
+
+	go func() { apiServer.Shutdown(ctx); wg.Done() }()
+	go func() { opsServer.Shutdown(ctx); wg.Done() }()
+
+	select {
+	case <-ctx.Done():
+		log.Println("timed out waiting for servers to shutdown")
+	case <-shutdownDone:
+		log.Println("both servers shutdown successfully")
+	}
+
+	os.Exit(0)
 }

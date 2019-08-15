@@ -29,10 +29,13 @@ type Config struct {
 	Api ServerConfig
 	Ops ServerConfig
 
+	GracefulTimeoutSecs uint
+
 	Providers []OIDCConfig
 }
 
 var config = Config{
+	GracefulTimeoutSecs: 15,
 	Api: ServerConfig{
 		Addr: "127.0.0.1:8080",
 

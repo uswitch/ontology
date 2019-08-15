@@ -9,6 +9,30 @@ import (
 	"sync"
 )
 
+func apiHandler(config *Config) (http.Handler, error) {
+	oidcAuth, err := NewOIDCAuthenticator(context.Background(), config.Providers)
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't load OIDC providers: %v", err)
+	}
+
+	auditLogger := log.New(os.Stderr, "audit\t", 0)
+
+	apiMux := http.NewServeMux()
+
+	return oidcAuth.Middleware(AuditMiddleware(auditLogger, apiMux)), nil
+}
+
+func opsHandler(config *Config) (http.Handler, error) {
+	opsMux := http.NewServeMux()
+
+	opsMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		fmt.Fprint(w, "OK")
+	})
+
+	return opsMux, nil
+}
+
 func main() {
 	var serverWaitGroup sync.WaitGroup
 
@@ -22,49 +46,41 @@ func main() {
 		log.Fatalf("Couldn't load config file from '%s': %v", configPath, err)
 	}
 
-	oidcAuth, err := NewOIDCAuthenticator(context.Background(), config.Providers)
-	if err != nil {
-		log.Fatalf("Couldn't load OIDC providers: %v", err)
+	if api, err := apiHandler(config); err != nil {
+		log.Fatal(err)
+	} else {
+		apiServer := &http.Server{
+			Addr:    config.ApiAddr,
+			Handler: api,
+		}
+
+		serverWaitGroup.Add(1)
+
+		go func() {
+			defer serverWaitGroup.Done()
+
+			log.Printf("API server listening on: %v", apiServer.Addr)
+			log.Println(apiServer.ListenAndServe())
+		}()
 	}
 
-	auditLogger := log.New(os.Stderr, "audit\t", 0)
+	if ops, err := opsHandler(config); err != nil {
+		log.Fatal(err)
+	} else {
+		opsServer := &http.Server{
+			Addr:    config.OpsAddr,
+			Handler: ops,
+		}
 
-	apiMux := http.NewServeMux()
+		serverWaitGroup.Add(1)
 
-	apiServer := &http.Server{
-		Addr:    config.ApiAddr,
-		Handler: oidcAuth.Middleware(AuditMiddleware(auditLogger, apiMux)),
+		go func() {
+			defer serverWaitGroup.Done()
+
+			log.Printf("Ops server listening on: %v", opsServer.Addr)
+			log.Println(opsServer.ListenAndServe())
+		}()
 	}
-
-	serverWaitGroup.Add(1)
-
-	go func() {
-		defer serverWaitGroup.Done()
-
-		log.Printf("API server listening on: %v", apiServer.Addr)
-		log.Println(apiServer.ListenAndServe())
-	}()
-
-	opsMux := http.NewServeMux()
-
-	opsMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		fmt.Fprint(w, "OK")
-	})
-
-	opsServer := &http.Server{
-		Addr:    config.OpsAddr,
-		Handler: opsMux,
-	}
-
-	serverWaitGroup.Add(1)
-
-	go func() {
-		defer serverWaitGroup.Done()
-
-		log.Printf("Ops server listening on: %v", opsServer.Addr)
-		log.Println(opsServer.ListenAndServe())
-	}()
 
 	serverWaitGroup.Wait()
 

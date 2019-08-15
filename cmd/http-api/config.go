@@ -17,16 +17,36 @@ type OIDCConfig struct {
 	UserClaim string
 }
 
+type ServerConfig struct {
+	Addr string
+
+	WriteTimeoutSecs uint
+	ReadTimeoutSecs  uint
+	IdleTimeoutSecs  uint
+}
+
 type Config struct {
-	ApiAddr string
-	OpsAddr string
+	Api ServerConfig
+	Ops ServerConfig
 
 	Providers []OIDCConfig
 }
 
 var config = Config{
-	ApiAddr: "127.0.0.1:8080",
-	OpsAddr: "127.0.0.1:8081",
+	Api: ServerConfig{
+		Addr: "127.0.0.1:8080",
+
+		WriteTimeoutSecs: 15,
+		ReadTimeoutSecs:  15,
+		IdleTimeoutSecs:  60,
+	},
+	Ops: ServerConfig{
+		Addr: "127.0.0.1:8081",
+
+		WriteTimeoutSecs: 15,
+		ReadTimeoutSecs:  15,
+		IdleTimeoutSecs:  60,
+	},
 }
 
 func (c Config) validate() error {

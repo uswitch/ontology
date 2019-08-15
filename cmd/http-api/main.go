@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 )
 
 func apiHandler(config *Config) (http.Handler, error) {
@@ -33,6 +34,35 @@ func opsHandler(config *Config) (http.Handler, error) {
 	return opsMux, nil
 }
 
+func startServerInGroup(wg *sync.WaitGroup, name string, handler http.Handler, config ServerConfig) *http.Server {
+	server := &http.Server{
+		Addr:    config.Addr,
+		Handler: handler,
+
+		WriteTimeout: time.Second * time.Duration(config.WriteTimeoutSecs),
+		ReadTimeout:  time.Second * time.Duration(config.ReadTimeoutSecs),
+		IdleTimeout:  time.Second * time.Duration(config.IdleTimeoutSecs),
+	}
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		log.Printf(
+			"%s server listening on %v. timeouts: [w %v, r %v, i %v]",
+			name,
+			server.Addr,
+			server.WriteTimeout,
+			server.ReadTimeout,
+			server.IdleTimeout,
+		)
+		log.Println(server.ListenAndServe())
+	}()
+
+	return server
+}
+
 func main() {
 	var serverWaitGroup sync.WaitGroup
 
@@ -49,37 +79,13 @@ func main() {
 	if api, err := apiHandler(config); err != nil {
 		log.Fatal(err)
 	} else {
-		apiServer := &http.Server{
-			Addr:    config.ApiAddr,
-			Handler: api,
-		}
-
-		serverWaitGroup.Add(1)
-
-		go func() {
-			defer serverWaitGroup.Done()
-
-			log.Printf("API server listening on: %v", apiServer.Addr)
-			log.Println(apiServer.ListenAndServe())
-		}()
+		startServerInGroup(&serverWaitGroup, "api", api, config.Api)
 	}
 
 	if ops, err := opsHandler(config); err != nil {
 		log.Fatal(err)
 	} else {
-		opsServer := &http.Server{
-			Addr:    config.OpsAddr,
-			Handler: ops,
-		}
-
-		serverWaitGroup.Add(1)
-
-		go func() {
-			defer serverWaitGroup.Done()
-
-			log.Printf("Ops server listening on: %v", opsServer.Addr)
-			log.Println(opsServer.ListenAndServe())
-		}()
+		startServerInGroup(&serverWaitGroup, "ops", ops, config.Ops)
 	}
 
 	serverWaitGroup.Wait()

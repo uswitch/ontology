@@ -14,14 +14,13 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-func TestOIDCHappyPath(t *testing.T) {
-	// given a provider config and token, for a known username
-	expectedUser := "wibble@bibble.com"
-	providerConfig, token, err := setupProviderAndToken(expectedUser, "https://bibble.com", "api", "sub")
-	if err != nil {
-		t.Fatalf("Couldn't create provider and token: %v", err)
-	}
+var (
+	expectedUser = "wibble@bibble.com"
+	providerConfig, token, _ = setupProviderAndToken(expectedUser, "https://bibble.com", "api", "sub")
+	providerConfig2, token2, _ = setupProviderAndToken(expectedUser, "https://thing.bibble.com", "thing", "sub")
+)
 
+func TestOIDCHappyPath(t *testing.T) {
 	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token))
 
 	if response.StatusCode != 200 {
@@ -34,17 +33,8 @@ func TestOIDCHappyPath(t *testing.T) {
 }
 
 func TestOIDCTwoProviders(t *testing.T) {
-	expectedUser := "wibble@bibble.com"
-	providerConfig1, _, err := setupProviderAndToken(expectedUser, "https://bibble.com", "api", "sub")
-	if err != nil {
-		t.Fatalf("Couldn't create provider1 and token: %v", err)
-	}
-	providerConfig2, token, err := setupProviderAndToken(expectedUser, "https://thing.bibble.com", "thing", "sub")
-	if err != nil {
-		t.Fatalf("Couldn't create provider2 and token: %v", err)
-	}
 
-	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig1, providerConfig2}, fmt.Sprintf("Bearer %s", token))
+	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig2, providerConfig2}, fmt.Sprintf("Bearer %s", token2))
 
 	if response.StatusCode != 200 {
 		t.Errorf("%d expected but got %d", 200, response.StatusCode)
@@ -81,17 +71,7 @@ func TestOIDCAuthHeaderMalformed(t *testing.T) {
 }
 
 func TestOIDCNoVerifiedProvider(t *testing.T) {
-	expectedUser := "wibble@bibble.com"
-	providerConfig, _, err := setupProviderAndToken(expectedUser, "https://bibble.com", "api", "sub")
-	if err != nil {
-		t.Fatalf("Couldn't create provider1 and token: %v", err)
-	}
-	_, token, err := setupProviderAndToken(expectedUser, "https://thing.bibble.com", "thing", "sub")
-	if err != nil {
-		t.Fatalf("Couldn't create provider2 and token: %v", err)
-	}
-
-	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token))
+	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token2))
 
 	if response.StatusCode != 401 {
 		t.Errorf("%d expected but got %d", 401, response.StatusCode)

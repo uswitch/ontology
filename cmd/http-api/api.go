@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/graphql-go/handler"
+
 	"github.com/uswitch/ontology/pkg/audit"
 	"github.com/uswitch/ontology/pkg/authnz"
 	"github.com/uswitch/ontology/pkg/middleware"
@@ -42,6 +44,20 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 			}
 		}
 	})
+
+	schema, err := NewGraphQLSchema(s)
+	if err != nil {
+		return nil, err
+	}
+
+	h := handler.New(&handler.Config{
+		Schema: schema,
+		Pretty: true,
+		GraphiQL: false,
+		Playground: true,
+	})
+
+	apiMux.Handle("/graphql", h)
 
 	return middleware.Wrap(
 		[]middleware.Middleware{

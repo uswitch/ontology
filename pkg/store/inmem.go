@@ -243,11 +243,11 @@ func (s *inmemStore) ListByType(typ *Type, options ListOptions) ([]*Thing, error
 		options.NumberOfResults = DefaultNumberOfResults
 	}
 
-	size := min(len(things), int(options.NumberOfResults))
+	size := min(len(things) - int(options.Offset), int(options.NumberOfResults))
 
 	out := make([]*Thing, size)
 	for idx, _ := range out {
-		out[idx] = things[idx]
+		out[idx] = things[int(options.Offset) + idx]
 	}
 
 	return out, nil

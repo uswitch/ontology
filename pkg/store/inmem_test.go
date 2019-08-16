@@ -307,6 +307,16 @@ func TestList(t *testing.T) {
 		"/relation",
 	})
 
+	// offset
+	assertList(t, store.List, ListOptions{NumberOfResults: 1, Offset: 1}, 1, []string{
+		"/relation",
+	})
+
+	// offset the overlaps the end
+	assertList(t, store.List, ListOptions{NumberOfResults: 3, Offset: 3}, 1, []string{
+		"/wibble",
+	})
+
 	// ask for offset bigger than the number of things
 	assertList(t, store.List, ListOptions{Offset: 10}, 0, []string{})
 }

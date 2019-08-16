@@ -84,6 +84,8 @@ const (
 	SortByID = SortField(iota)
 )
 
+const DefaultNumberOfResults = uint(10)
+
 type ListOptions struct {
 	SortOrder
 	SortField
@@ -93,7 +95,7 @@ type ListOptions struct {
 }
 
 type Store interface {
-	Add(*Thing) error
+	Add(...*Thing) error
 	AddAll([]*Thing) error
 
 	Len() (int, error)

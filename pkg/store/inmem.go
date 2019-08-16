@@ -32,13 +32,8 @@ func (s *inmemStore) Len() (int, error) {
 	return len(s.things), nil
 }
 
-func (s *inmemStore) Add(thing *Thing) error {
-	s.rw.Lock()
-	defer s.rw.Unlock()
-
-	s.things[thing.ID] = thing
-
-	return nil
+func (s *inmemStore) Add(things ...*Thing) error {
+	return s.AddAll(things)
 }
 
 func (s *inmemStore) AddAll(things []*Thing) error {
@@ -245,7 +240,7 @@ func (s *inmemStore) ListByType(typ *Type, options ListOptions) ([]*Thing, error
 	}
 
 	if options.NumberOfResults == 0 {
-		options.NumberOfResults = 10
+		options.NumberOfResults = DefaultNumberOfResults
 	}
 
 	size := min(len(things), int(options.NumberOfResults))

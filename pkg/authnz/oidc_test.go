@@ -2,22 +2,30 @@ package authnz
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
+	"github.com/uswitch/ontology/pkg/authnz/authnztest"
 )
 
 var (
 	expectedUser = "wibble@bibble.com"
-	providerConfig, token, _ = setupProviderAndToken(expectedUser, "https://bibble.com", "api", "sub")
-	providerConfig2, token2, _ = setupProviderAndToken(expectedUser, "https://thing.bibble.com", "thing", "sub")
+	keys, token, _ = authnztest.SetupKeysAndToken(expectedUser, "https://bibble.com", "api", "sub")
+	providerConfig = OIDCConfig{
+		URL: "https://bibble.com",
+		Keys: keys,
+		ClientID: "api",
+		UserClaim: "sub",
+	}
+	keys2, token2, _ = authnztest.SetupKeysAndToken(expectedUser, "https://thing.bibble.com", "thing", "sub")
+	providerConfig2 = OIDCConfig{
+		URL: "https://thing.bibble.com",
+		Keys: keys2,
+		ClientID: "thing",
+		UserClaim: "sub",
+	}
 )
 
 func TestOIDCHappyPath(t *testing.T) {
@@ -84,10 +92,17 @@ func TestOIDCNoVerifiedProvider(t *testing.T) {
 
 func TestOIDCNoMatchingUserClaim(t *testing.T) {
 	expectedUser := "wibble@bibble.com"
-	providerConfig, token, err := setupProviderAndToken(expectedUser, "https://bibble.com", "api", "user")
+	keys, token, err := authnztest.SetupKeysAndToken(expectedUser, "https://bibble.com", "api", "user")
 	if err != nil {
-		t.Fatalf("Couldn't create provider1 and token: %v", err)
+		t.Fatalf("Couldn't create keys and token: %v", err)
 	}
+	providerConfig = OIDCConfig{
+		URL: "https://bibble.com",
+		Keys: keys,
+		ClientID: "api",
+		UserClaim: "user",
+	}
+
 
 	response, user := doOIDCMiddleware(t, []OIDCConfig{providerConfig}, fmt.Sprintf("Bearer %s", token))
 
@@ -98,52 +113,6 @@ func TestOIDCNoMatchingUserClaim(t *testing.T) {
 	if user == expectedUser {
 		t.Error("user shouldn't be correct")
 	}
-}
-
-func setupProviderAndToken(user, iss, aud, claim string) (OIDCConfig, string, error) {
-	kid := "wibble"
-	alg := "RS256"
-	use := "sig"
-
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return OIDCConfig{}, "", err
-	}
-
-	priv := jose.JSONWebKey{Key: key, KeyID: kid, Algorithm: alg, Use: use}
-	pub := jose.JSONWebKey{Key: key.Public(), KeyID: kid, Algorithm: alg, Use: use}
-
-	config := OIDCConfig{
-		URL:       iss,
-		Keys:      []jose.JSONWebKey{priv, pub},
-		ClientID:  aud,
-		UserClaim: claim,
-	}
-
-	sig, err := jose.NewSigner(
-		jose.SigningKey{
-			Algorithm: jose.RS256,
-			Key:       priv,
-		},
-		(&jose.SignerOptions{}).WithType("JWT"),
-	)
-	if err != nil {
-		return OIDCConfig{}, "", err
-	}
-
-	cl := jwt.Claims{
-		Subject:   user,
-		Issuer:    iss,
-		Expiry:    jwt.NewNumericDate(time.Now().Add(time.Hour * 1)),
-		NotBefore: jwt.NewNumericDate(time.Date(2016, 1, 1, 0, 0, 0, 0, time.UTC)),
-		Audience:  jwt.Audience{aud},
-	}
-	raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
-	if err != nil {
-		return OIDCConfig{}, "", err
-	}
-
-	return config, raw, nil
 }
 
 func oidcTestHandler(out *string) http.Handler {

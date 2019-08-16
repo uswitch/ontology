@@ -5,7 +5,7 @@ import (
 )
 
 type Middleware interface {
-	Middleware(http.Handler)http.Handler
+	Middleware(http.Handler) http.Handler
 }
 
 func Wrap(middleware []Middleware, handler http.Handler) http.Handler {
@@ -17,3 +17,13 @@ func Wrap(middleware []Middleware, handler http.Handler) http.Handler {
 
 	return h
 }
+
+type MiddlewareFunc func(http.Handler) http.Handler
+
+func (fn MiddlewareFunc) Middleware(r http.Handler) http.Handler {
+	return fn(r)
+}
+
+var PassThru = MiddlewareFunc(func(h http.Handler) http.Handler {
+	return h
+})

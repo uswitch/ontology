@@ -24,17 +24,17 @@ func (id ID) String() string { return string(id) }
 func (id ID) ID() ID         { return id }
 
 type Metadata struct {
-	ID        ID
-	Type      ID
-	Name      string
-	UpdatedAt time.Time
+	ID        ID        `json:"id"`
+	Type      ID        `json:"type"`
+	Name      string    `json:"name"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Properties map[string]interface{}
 
 type Thing struct {
-	Metadata
-	Properties
+	Metadata   `json:"metadata"`
+	Properties `json:"properties"`
 }
 
 type Thingable interface {

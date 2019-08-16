@@ -14,20 +14,8 @@ import (
 	"github.com/uswitch/ontology/pkg/audit"
 	"github.com/uswitch/ontology/pkg/authnz"
 	"github.com/uswitch/ontology/pkg/middleware"
+	"github.com/uswitch/ontology/pkg/store/inmem"
 )
-
-func apiHandler(authn authnz.Authenticator, auditLogger audit.Logger, cors middleware.Middleware) (http.Handler, error) {
-	apiMux := http.NewServeMux()
-
-	return middleware.Wrap(
-		[]middleware.Middleware{
-			cors,
-			authn,
-			auditLogger,
-		},
-		apiMux,
-	), nil
-}
 
 func opsHandler() (http.Handler, error) {
 	opsMux := http.NewServeMux()
@@ -94,7 +82,9 @@ func main() {
 	auditLogger := audit.NewAuditLogger(log.New(os.Stderr, "audit\t", 0))
 	cors := middleware.NewCORSMiddleware(config.Api.CORS)
 
-	if api, err := apiHandler(oidcAuth, auditLogger, cors); err != nil {
+	store := inmem.NewInMemoryStore()
+
+	if api, err := apiHandler(store, oidcAuth, auditLogger, cors); err != nil {
 		log.Fatal(err)
 	} else {
 		apiServer = startServer("api", api, config.Api.Server)

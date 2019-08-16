@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 )
 
@@ -30,6 +31,9 @@ type Thing struct {
 func (t *Thing) Thing() *Thing { return t }
 func (t *Thing) String() string {
 	return fmt.Sprintf("%v[%v]%v", t.Metadata.ID, t.Metadata.Type, t.Properties)
+}
+func (t1 *Thing) Equal(t2 *Thing) bool {
+	return reflect.DeepEqual(t1, t2)
 }
 
 type Entity Thing

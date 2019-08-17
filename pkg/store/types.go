@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	ErrUnimplemented = errors.New("Unimplemented")
-	ErrNotFound      = errors.New("Thing not found")
+	ErrUnimplemented     = errors.New("Unimplemented")
+	ErrNotFound          = errors.New("Thing not found")
+	ErrEntityNotInvolved = errors.New("Entity not involved in relationship")
 )
 
 type ID string
@@ -52,6 +53,18 @@ func (r *Relation) Involves(entity *Entity) bool {
 	b, bOk := r.Properties["b"].(string)
 
 	return (aOk && ID(a) == entity.Metadata.ID) || (bOk && ID(b) == entity.Metadata.ID)
+}
+func (r *Relation) OtherID(entity *Entity) (ID, error) {
+	a := ID(r.Properties["a"].(string))
+	b := ID(r.Properties["b"].(string))
+
+	if a == entity.Metadata.ID {
+		return b, nil
+	} else if b == entity.Metadata.ID {
+		return a, nil
+	} else {
+		return ID(""), ErrEntityNotInvolved
+	}
 }
 
 type Type Thing

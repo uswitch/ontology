@@ -67,3 +67,33 @@ func TestRelationInvolves(t *testing.T) {
 		}
 	}
 }
+
+func TestRelationOtherID(t *testing.T) {
+	cases := []struct {
+		Rel     Relation
+		Ent     Entity
+		OtherID ID
+		Err     error
+	}{
+		{
+			Rel:     Relation{Properties: Properties{"a": "/ent/1", "b": "/ent/2"}},
+			Ent:     Entity{Metadata: Metadata{ID: ID("/ent/1")}},
+			OtherID: ID("/ent/2"),
+			Err:     nil,
+		},
+		{
+			Rel:     Relation{Properties: Properties{"a": "/ent/1", "b": "/ent/2"}},
+			Ent:     Entity{Metadata: Metadata{ID: ID("/ent/3")}},
+			OtherID: ID(""),
+			Err:     ErrEntityNotInvolved,
+		},
+	}
+
+	for _, c := range cases {
+		if otherID, err := c.Rel.OtherID(&c.Ent); err != c.Err {
+			t.Errorf("expected err %v, but it was %v", c.Err, err)
+		} else if otherID != c.OtherID {
+			t.Errorf("expected %v to be the other id of %v + %v, but it was %v", c.OtherID, c.Rel, c.Ent, otherID)
+		}
+	}
+}

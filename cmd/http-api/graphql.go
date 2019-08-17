@@ -74,10 +74,12 @@ func NewGraphQLSchema(s store.Store) (*graphql.Schema, error) {
 		Type:        metadataType,
 		Description: "Metadata for this thing",
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			thing, ok := p.Source.(*store.Thing)
+			thingable, ok := p.Source.(store.Thingable)
 			if !ok {
-				return nil, fmt.Errorf("Not a thing")
+				return nil, fmt.Errorf("Not thingable")
 			}
+
+			thing := thingable.Thing()
 
 			return thing.Metadata, nil
 		},
@@ -103,7 +105,7 @@ func NewGraphQLSchema(s store.Store) (*graphql.Schema, error) {
 			} else if match, _ := s.IsA(thing, store.TypeType); match {
 				return typeType
 			} else {
-				log.Printf("unknown type: %s", thing.Metadata.Type)
+				log.Printf("unknown type: %v", thing)
 			}
 
 			return nil
@@ -111,9 +113,9 @@ func NewGraphQLSchema(s store.Store) (*graphql.Schema, error) {
 		},
 	})
 
-	entityType = graphql.NewObject(graphql.ObjectConfig{
-		Name:        "Entity",
-		Description: "An entity",
+	typeType = graphql.NewObject(graphql.ObjectConfig{
+		Name:        "Type",
+		Description: "A type",
 		Fields: graphql.Fields{
 			"metadata": metadataField,
 		},
@@ -133,11 +135,24 @@ func NewGraphQLSchema(s store.Store) (*graphql.Schema, error) {
 		},
 	})
 
-	typeType = graphql.NewObject(graphql.ObjectConfig{
-		Name:        "Type",
-		Description: "A type",
+	entityType = graphql.NewObject(graphql.ObjectConfig{
+		Name:        "Entity",
+		Description: "An entity",
 		Fields: graphql.Fields{
 			"metadata": metadataField,
+			"relations": &graphql.Field{
+				Type: graphql.NewList(relationType),
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					thing, ok := p.Source.(*store.Thing)
+					if !ok {
+						return nil, fmt.Errorf("Not an thing: %v", p.Source)
+					}
+
+					entity := (*store.Entity)(thing)
+
+					return s.ListRelationsForEntity(entity, store.ListOptions{})
+				},
+			},
 		},
 		Interfaces: []*graphql.Interface{
 			thingInterface,
@@ -316,5 +331,3 @@ func NewGraphQLSchema(s store.Store) (*graphql.Schema, error) {
 
 	return &schema, nil
 }
-
-var ()

@@ -135,33 +135,54 @@ func NewGraphQLSchema(s store.Store) (*graphql.Schema, error) {
 		},
 	})
 
+	type relatedEntity struct {
+		relation *store.Relation
+		entity   *store.Entity
+	}
+
 	entityType = graphql.NewObject(graphql.ObjectConfig{
 		Name:        "Entity",
 		Description: "An entity",
 		Fields: graphql.Fields{
 			"metadata": metadataField,
-			"relations": &graphql.Field{
-				Type: graphql.NewList(relationType),
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					thing, ok := p.Source.(*store.Thing)
-					if !ok {
-						return nil, fmt.Errorf("Not an thing: %v", p.Source)
-					}
-
-					entity := (*store.Entity)(thing)
-
-					return s.ListRelationsForEntity(entity, store.ListOptions{})
-				},
-			},
 		},
 		Interfaces: []*graphql.Interface{
 			thingInterface,
 		},
 	})
 
+	relatedEntityType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "RelatedEntity",
+		Fields: graphql.Fields{
+			"metadata": &graphql.Field{
+				Type:        metadataType,
+				Description: "Metadata for this thing",
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					relEnt, ok := p.Source.(*relatedEntity)
+					if !ok {
+						return nil, fmt.Errorf("Not a relatedEntity: %v", p.Source)
+					}
+
+					return relEnt.relation.Metadata, nil
+				},
+			},
+			"entity": &graphql.Field{
+				Type: entityType,
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					relEnt, ok := p.Source.(*relatedEntity)
+					if !ok {
+						return nil, fmt.Errorf("Not a relatedEntity: %v", p.Source)
+					}
+
+					return relEnt.entity, nil
+				},
+			},
+		},
+	})
+
 	type Page struct {
 		Cursor string
-		Limit int
+		Limit  int
 	}
 
 	pageType := graphql.NewObject(graphql.ObjectConfig{
@@ -190,6 +211,122 @@ func NewGraphQLSchema(s store.Store) (*graphql.Schema, error) {
 					return page.Limit, nil
 				},
 			},
+		},
+	})
+
+	type RelatedEntityPage struct {
+		Page
+		List []*relatedEntity
+	}
+
+	relatedEntityPageType := graphql.NewObject(graphql.ObjectConfig{
+		Name:        "RelatedEntityPage",
+		Description: "An page of related entities",
+		Fields: graphql.Fields{
+			"list": &graphql.Field{
+				Type: graphql.NewList(relatedEntityType),
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					relEntPage, ok := p.Source.(*RelatedEntityPage)
+					if !ok {
+						return nil, fmt.Errorf("Not a RelatedEntityPage: %v", p.Source)
+					}
+
+					return relEntPage.List, nil
+				},
+			},
+			"page": &graphql.Field{
+				Type: pageType,
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					relEntPage, ok := p.Source.(*RelatedEntityPage)
+					if !ok {
+						return nil, fmt.Errorf("Not a RelatedEntityPage: %v", p.Source)
+					}
+
+					return relEntPage.Page, nil
+				},
+			},
+		},
+	})
+
+	entityType.AddFieldConfig("relatedEntities", &graphql.Field{
+		Type: relatedEntityPageType,
+		Args: graphql.FieldConfigArgument{
+			"limit": &graphql.ArgumentConfig{
+				Type:         graphql.Int,
+				DefaultValue: int(store.DefaultNumberOfResults),
+			},
+			"cursor": &graphql.ArgumentConfig{
+				Type: graphql.String,
+			},
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			thing, ok := p.Source.(*store.Thing)
+			if !ok {
+				return nil, fmt.Errorf("Not an thing: %v", p.Source)
+			}
+
+			entity := (*store.Entity)(thing)
+
+			limit := p.Args["limit"].(int)
+			cursor, cursorOk := p.Args["cursor"].(string)
+
+			offset := uint(0)
+
+			if cursorOk {
+				decodedCursor, err := base64.StdEncoding.DecodeString(cursor)
+				if err != nil {
+					return nil, err
+				}
+
+				offset64, err := strconv.ParseUint(string(decodedCursor), 10, bits.UintSize)
+				if err != nil {
+					return nil, err
+				}
+
+				offset = uint(offset64)
+			}
+
+			listOptions := store.ListOptions{
+				SortOrder:       store.SortAscending,
+				SortField:       store.SortByID,
+				Offset:          offset,
+				NumberOfResults: uint(limit),
+			}
+
+			var relations []*store.Relation
+			var err error
+
+			relations, err = s.ListRelationsForEntity(entity, listOptions)
+			if err != nil {
+				return nil, err
+			}
+
+			relatedEntities := make([]*relatedEntity, len(relations))
+
+			for idx, relation := range relations {
+				otherID, err := relation.OtherID(entity)
+				if err != nil {
+					return nil, err
+				}
+
+				otherEntity, err := s.GetEntityByID(otherID)
+				if err != nil {
+					return nil, err
+				}
+
+				relatedEntities[idx] = &relatedEntity{
+					relation: relation,
+					entity:   otherEntity,
+				}
+			}
+
+			newOffset := offset + uint(len(relatedEntities))
+			encodedCursor := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", newOffset)))
+
+			return &RelatedEntityPage{
+				Page: Page{Cursor: encodedCursor, Limit: limit},
+				List: relatedEntities,
+			}, nil
 		},
 	})
 

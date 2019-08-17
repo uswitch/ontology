@@ -188,30 +188,28 @@ func min(x, y int) int {
 	return y
 }
 
-func (s *inmemStore) ListByType(typ *Type, options ListOptions) ([]*Thing, error) {
+func (s *inmemStore) listAllByType(typ *Type) ([]*Thing, error) {
+	s.rw.RLock()
+	defer s.rw.RUnlock()
 
-	// extract a list of things
 	things := []*Thing{}
 
-	{
-		s.rw.RLock()
-		defer s.rw.RUnlock()
-
-		for _, thing := range s.things {
-			if typ != nil {
-				if ok, err := s.IsA(thing, typ); !ok {
-					continue
-				} else if err != nil {
-					return things, err
-				}
+	for _, thing := range s.things {
+		if typ != nil {
+			if ok, err := s.IsA(thing, typ); !ok {
+				continue
+			} else if err != nil {
+				return things, err
 			}
-
-			things = append(things, thing)
 		}
+
+		things = append(things, thing)
 	}
 
-	// sort that list of things
+	return things, nil
+}
 
+func (s *inmemStore) constrainList(things []*Thing, options ListOptions) ([]*Thing, error) {
 	if options.SortField != SortByID {
 		return []*Thing{}, ErrUnimplemented
 	}
@@ -251,4 +249,41 @@ func (s *inmemStore) ListByType(typ *Type, options ListOptions) ([]*Thing, error
 	}
 
 	return out, nil
+}
+
+func (s *inmemStore) ListByType(typ *Type, options ListOptions) ([]*Thing, error) {
+	things, err := s.listAllByType(typ)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.constrainList(things, options)
+}
+
+func (s *inmemStore) ListRelationsForEntity(entity *Entity, options ListOptions) ([]*Relation, error) {
+	allRelations, err := s.listAllByType(RelationType)
+	if err != nil {
+		return nil, err
+	}
+
+	involvedRelations := []*Thing{}
+
+	for _, relationThing := range allRelations {
+		relation := (*Relation)(relationThing)
+		if relation.Involves(entity) {
+			involvedRelations = append(involvedRelations, relation.Thing())
+		}
+	}
+
+	constrainedThings, err := s.constrainList(involvedRelations, options)
+	if err != nil {
+		return nil, err
+	}
+
+	relations := make([]*Relation, len(constrainedThings))
+	for idx, thing := range constrainedThings {
+		relations[idx] = (*Relation)(thing)
+	}
+
+	return relations, nil
 }

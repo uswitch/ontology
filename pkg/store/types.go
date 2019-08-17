@@ -47,6 +47,12 @@ func (t *Entity) Thing() *Thing { return (*Thing)(t) }
 type Relation Thing
 
 func (t *Relation) Thing() *Thing { return (*Thing)(t) }
+func (r *Relation) Involves(entity *Entity) bool {
+	a, aOk := r.Properties["a"].(string)
+	b, bOk := r.Properties["b"].(string)
+
+	return (aOk && ID(a) == entity.Metadata.ID) || (bOk && ID(b) == entity.Metadata.ID)
+}
 
 type Type Thing
 
@@ -113,7 +119,10 @@ type Store interface {
 
 	List(ListOptions) ([]*Thing, error)
 	ListByType(*Type, ListOptions) ([]*Thing, error)
+
 	ListEntities(ListOptions) ([]*Entity, error)
 	ListRelations(ListOptions) ([]*Relation, error)
 	ListTypes(ListOptions) ([]*Type, error)
+
+	ListRelationsForEntity(*Entity, ListOptions) ([]*Relation, error)
 }

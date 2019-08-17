@@ -4,17 +4,32 @@ import (
 	"testing"
 )
 
-func thingWithType(thingID string, typeID string) *Thing {
-	return &Thing{
+func thingWithType(thingID string, typeID string, properties *Properties) *Thing {
+	thing := &Thing{
 		Metadata: Metadata{
 			ID:   ID(thingID),
 			Type: ID(typeID),
 		},
 	}
+
+	if properties != nil {
+		thing.Properties = *properties
+	}
+
+	return thing
 }
-func entity(ID string) *Thing   { return thingWithType(ID, "/entity") }
-func relation(ID string) *Thing { return thingWithType(ID, "/relation") }
-func ntype(ID string) *Thing    { return thingWithType(ID, "/type") }
+func entity(ID string) *Thing   { return thingWithType(ID, "/entity", nil) }
+func relation(ID string) *Thing { return thingWithType(ID, "/relation", nil) }
+func ntype(ID string) *Thing    { return thingWithType(ID, "/type", nil) }
+func relationBetween(ID, a, b string) *Thing {
+	return thingWithType(
+		ID, "/relation",
+		&Properties{
+			"a": a,
+			"b": b,
+		},
+	)
+}
 
 func TestLen(t *testing.T) {
 	store := NewInMemoryStore()
@@ -119,7 +134,7 @@ func TestGetCorrectType(t *testing.T) {
 		entity("/wibble/bibble/1"),
 		relation("/wibble/bibble/2"),
 		ntype("/wibble/bibble/3"),
-		thingWithType("/wibble/bibble/4", "/type/"),
+		thingWithType("/wibble/bibble/4", "/type/", nil),
 	}); err != nil {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
@@ -268,6 +283,35 @@ func compareLists(t *testing.T, listFunc1 func(ListOptions) ([]*Thing, error), l
 			t.Errorf("things1[%d] %v != things[%d] %v", idx, ID1, idx, ID2)
 		}
 	}
+}
+
+func listRelationsForEntity(store Store, ent *Entity) func(ListOptions) ([]*Thing, error) {
+	return convertRelationsToThings(func(opts ListOptions) ([]*Relation, error) {
+		return store.ListRelationsForEntity(ent, opts)
+	})
+}
+
+func TestListRelationsForEntity(t *testing.T) {
+	store := NewInMemoryStore()
+
+	ent1 := entity("/ent/1")
+
+	if err := store.AddAll([]*Thing{
+		ent1,
+		entity("/ent/2"),
+		entity("/ent/3"),
+		relationBetween("/rel/1", "/ent/1", "/ent/2"),
+		relationBetween("/rel/2", "/ent/3", "/ent/1"),
+		relationBetween("/rel/3", "/ent/2", "/ent/3"),
+	}); err != nil {
+		t.Fatalf("Couldn't add to store: %v", err)
+	}
+
+	assertList(t, listRelationsForEntity(store, (*Entity)(ent1)), ListOptions{}, 2, []string{
+		"/rel/1",
+		"/rel/2",
+	})
+
 }
 
 func TestList(t *testing.T) {

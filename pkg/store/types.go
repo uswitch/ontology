@@ -28,6 +28,10 @@ type Thing struct {
 	Properties
 }
 
+type Thingable interface {
+	Thing() *Thing
+}
+
 func (t *Thing) Thing() *Thing { return t }
 func (t *Thing) String() string {
 	return fmt.Sprintf("%v[%v]%v", t.Metadata.ID, t.Metadata.Type, t.Properties)

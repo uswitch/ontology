@@ -1,4 +1,4 @@
-package main
+package authnz
 
 import (
 	"context"
@@ -148,7 +148,7 @@ func setupProviderAndToken(user, iss, aud, claim string) (OIDCConfig, string, er
 
 func oidcTestHandler(out *string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		*out = r.Context().Value("user").(string)
+		*out = r.Context().Value(UserContextKey).(string)
 		w.WriteHeader(200)
 	})
 }

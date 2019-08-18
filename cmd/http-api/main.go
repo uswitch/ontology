@@ -10,10 +10,12 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/uswitch/ontology/pkg/authnz"
 )
 
 func apiHandler(config *Config) (http.Handler, error) {
-	oidcAuth, err := NewOIDCAuthenticator(context.Background(), config.Providers)
+	oidcAuth, err := authnz.NewOIDCAuthenticator(context.Background(), config.Providers)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't load OIDC providers: %v", err)
 	}

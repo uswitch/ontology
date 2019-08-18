@@ -6,16 +6,8 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"gopkg.in/square/go-jose.v2"
+	"github.com/uswitch/ontology/pkg/authnz"
 )
-
-type OIDCConfig struct {
-	URL  string
-	Keys []jose.JSONWebKey
-
-	ClientID  string
-	UserClaim string
-}
 
 type ServerConfig struct {
 	Addr string
@@ -31,7 +23,7 @@ type Config struct {
 
 	GracefulTimeoutSecs uint
 
-	Providers []OIDCConfig
+	Providers []authnz.OIDCConfig
 }
 
 var config = Config{

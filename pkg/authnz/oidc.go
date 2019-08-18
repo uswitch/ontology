@@ -1,4 +1,4 @@
-package main
+package authnz
 
 import (
 	"context"
@@ -11,6 +11,16 @@ import (
 	"gopkg.in/square/go-jose.v2"
 	"github.com/coreos/go-oidc"
 )
+
+const UserContextKey = "authnz-user"
+
+type OIDCConfig struct {
+	URL  string
+	Keys []jose.JSONWebKey
+
+	ClientID  string
+	UserClaim string
+}
 
 type provider struct {
 	Config   *OIDCConfig
@@ -133,6 +143,6 @@ func (o *OIDC) Middleware(next http.Handler) http.Handler {
 
 		log.Println(user)
 
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), "user", user)))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), UserContextKey, user)))
 	})
 }

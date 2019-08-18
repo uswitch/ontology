@@ -21,11 +21,11 @@ func apiHandler(config *Config) (http.Handler, error) {
 		return nil, fmt.Errorf("Couldn't load OIDC providers: %v", err)
 	}
 
-	auditLogger := log.New(os.Stderr, "audit\t", 0)
+	auditLogger := audit.NewAuditLog(log.New(os.Stderr, "audit\t", 0))
 
 	apiMux := http.NewServeMux()
 
-	return oidcAuth.Middleware(audit.AuditMiddleware(auditLogger, apiMux)), nil
+	return oidcAuth.Middleware(auditLogger.Middleware(apiMux)), nil
 }
 
 func opsHandler(config *Config) (http.Handler, error) {

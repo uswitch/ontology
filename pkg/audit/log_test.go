@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/uswitch/ontology/pkg/authnz"
 )
 
 func auditTestHandler() http.Handler {
@@ -18,20 +20,19 @@ func auditTestHandler() http.Handler {
 	})
 }
 
-func doAuditMiddleware(t *testing.T, expectedStatus int, expectedEntry AuditEntry) {
+func doAuditMiddleware(t *testing.T, expectedStatus int, expectedEntry AuditEntry, method, path, query string) {
 	stringBuffer := &strings.Builder{}
 	logger := log.New(stringBuffer, "", 0)
 
 	req := httptest.NewRequest(
-		expectedEntry.Method,
-		fmt.Sprintf("%s?%s", expectedEntry.Path, expectedEntry.Query),
-		nil,
+		method, fmt.Sprintf("%s?%s", path, query), nil,
 	)
-	reqWithUser := req.WithContext(context.WithValue(req.Context(), "user", expectedEntry.User))
+	reqWithUser := req.WithContext(context.WithValue(req.Context(), authnz.UserContextKey, expectedEntry.User))
 
 	w := httptest.NewRecorder()
 
-	middleware := AuditMiddleware(logger, auditTestHandler())
+	auditLogger := NewAuditLog(logger)
+	middleware := auditLogger.Middleware(auditTestHandler())
 	middleware.ServeHTTP(w, reqWithUser)
 
 	response := w.Result()
@@ -51,17 +52,18 @@ func doAuditMiddleware(t *testing.T, expectedStatus int, expectedEntry AuditEntr
 		if entry.User != expectedEntry.User {
 			t.Errorf("should have been '%s', but was '%s'", expectedEntry.User, entry.User)
 		}
-		if entry.Method != expectedEntry.Method {
-			t.Errorf("should have been '%s', but was '%s'", expectedEntry.Method, entry.Method)
-		}
-		if entry.Path != expectedEntry.Path {
-			t.Errorf("should have been '%s', but was '%s'", expectedEntry.Path, entry.Path)
-		}
-		if entry.Query != expectedEntry.Query {
-			t.Errorf("should have been '%s', but was '%s'", expectedEntry.Query, entry.Query)
-		}
 		if now := time.Now(); now.Sub(entry.Time) > (1 * time.Second) {
 			t.Errorf("should have been within a seconds of '%s', but was '%s'", now, entry.Time)
+		}
+
+		if len(entry.Data) != len(expectedEntry.Data) {
+			t.Errorf("expected entry doesn 't have the same number of keys: %d != %d", len(entry.Data), len(expectedEntry.Data))
+		}
+
+		for k, v := range expectedEntry.Data {
+			if entry.Data[k] != v {
+				t.Errorf("Data['%s'] should have been '%v', but was '%v'", k, v, entry.Data[k])
+			}
 		}
 	}
 
@@ -69,18 +71,22 @@ func doAuditMiddleware(t *testing.T, expectedStatus int, expectedEntry AuditEntr
 
 func TestAuditHappyPath(t *testing.T) {
 	doAuditMiddleware(t, 200, AuditEntry{
-		User:   "wibble@bibble.com",
-		Method: "GET",
-		Path:   "/",
-		Query:  "",
-	})
+		User: "wibble@bibble.com",
+		Data: AuditData{
+			"method": "GET",
+			"path":   "/",
+			"query":  "",
+		},
+	}, "GET", "/", "")
 }
 
 func TestMissingUser(t *testing.T) {
 	doAuditMiddleware(t, 500, AuditEntry{
-		User:   "",
-		Method: "GET",
-		Path:   "/",
-		Query:  "",
-	})
+		User: "",
+		Data: AuditData{
+			"method": "GET",
+			"path":   "/",
+			"query":  "",
+		},
+	}, "GET", "/", "")
 }

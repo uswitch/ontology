@@ -24,6 +24,11 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 			return
 		}
 
+		thingsAdded := []store.ID{}
+		defer func() {
+			auditLogger.Log(r.Context(), audit.AuditData{"thingsAdded": thingsAdded})
+		}()
+
 		decoder := json.NewDecoder(r.Body)
 
 		for ;; {
@@ -42,6 +47,8 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 				w.WriteHeader(500)
 				return
 			}
+
+			thingsAdded = append(thingsAdded, thing.Metadata.ID)
 		}
 	})
 

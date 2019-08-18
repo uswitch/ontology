@@ -13,22 +13,22 @@ import (
 
 	"github.com/uswitch/ontology/pkg/audit"
 	"github.com/uswitch/ontology/pkg/authnz"
+	"github.com/uswitch/ontology/pkg/middleware"
 )
 
-func apiHandler(config *Config) (http.Handler, error) {
-	oidcAuth, err := authnz.NewOIDCAuthenticator(context.Background(), config.Providers)
-	if err != nil {
-		return nil, fmt.Errorf("Couldn't load OIDC providers: %v", err)
-	}
-
-	auditLogger := audit.NewAuditLog(log.New(os.Stderr, "audit\t", 0))
-
+func apiHandler(authn authnz.Authenticator, auditLogger audit.Logger) (http.Handler, error) {
 	apiMux := http.NewServeMux()
 
-	return oidcAuth.Middleware(auditLogger.Middleware(apiMux)), nil
+	return middleware.Wrap(
+		[]middleware.Middleware{
+			authn,
+			auditLogger,
+		},
+		apiMux,
+	), nil
 }
 
-func opsHandler(config *Config) (http.Handler, error) {
+func opsHandler() (http.Handler, error) {
 	opsMux := http.NewServeMux()
 
 	opsMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -85,13 +85,20 @@ func main() {
 
 	var apiServer, opsServer *http.Server
 
-	if api, err := apiHandler(config); err != nil {
+	oidcAuth, err := authnz.NewOIDCAuthenticator(context.Background(), config.Providers)
+	if err != nil {
+		log.Fatalf("Couldn't load OIDC providers: %v", err)
+	}
+
+	auditLogger := audit.NewAuditLogger(log.New(os.Stderr, "audit\t", 0))
+
+	if api, err := apiHandler(oidcAuth, auditLogger); err != nil {
 		log.Fatal(err)
 	} else {
 		apiServer = startServer("api", api, config.Api)
 	}
 
-	if ops, err := opsHandler(config); err != nil {
+	if ops, err := opsHandler(); err != nil {
 		log.Fatal(err)
 	} else {
 		opsServer = startServer("ops", ops, config.Ops)

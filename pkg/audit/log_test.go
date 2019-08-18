@@ -31,7 +31,7 @@ func doAuditMiddleware(t *testing.T, expectedStatus int, expectedEntry AuditEntr
 
 	w := httptest.NewRecorder()
 
-	auditLogger := NewAuditLog(logger)
+	auditLogger := NewAuditLogger(logger)
 	middleware := auditLogger.Middleware(auditTestHandler())
 	middleware.ServeHTTP(w, reqWithUser)
 

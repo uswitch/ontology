@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/uswitch/ontology/pkg/authnz"
+	"github.com/uswitch/ontology/pkg/middleware"
 )
 
 const CallIDContextKey = "audit-call"
@@ -23,11 +24,17 @@ type AuditEntry struct {
 	Data   AuditData
 }
 
+type Logger interface{
+	middleware.Middleware
+
+	Log(context.Context,AuditData)
+}
+
 type auditLog struct {
 	logger *log.Logger
 }
 
-func NewAuditLog(logger *log.Logger) *auditLog {
+func NewAuditLogger(logger *log.Logger) Logger {
 	return &auditLog{
 		logger: logger,
 	}

@@ -12,8 +12,6 @@ import (
 	"github.com/coreos/go-oidc"
 )
 
-const UserContextKey = "authnz-user"
-
 type OIDCConfig struct {
 	URL  string
 	Keys []jose.JSONWebKey
@@ -56,7 +54,7 @@ func (keys LocalKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte
 	return nil, errors.New("failed to verify id token signature")
 }
 
-func NewOIDCAuthenticator(ctx context.Context, providerConfigs []OIDCConfig) (*OIDC, error) {
+func NewOIDCAuthenticator(ctx context.Context, providerConfigs []OIDCConfig) (Authenticator, error) {
 	oidcConfig := OIDC{
 		providers: make([]*provider, len(providerConfigs)),
 	}
@@ -112,7 +110,6 @@ func (o *OIDC) Middleware(next http.Handler) http.Handler {
 
 		for _, provider := range o.providers {
 			idToken, err = provider.Verifier.Verify(r.Context(), rawIDToken)
-			log.Println(err)
 			if err == nil {
 				verifiedProvider = provider
 				break
@@ -140,8 +137,6 @@ func (o *OIDC) Middleware(next http.Handler) http.Handler {
 			w.WriteHeader(500)
 			return
 		}
-
-		log.Println(user)
 
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), UserContextKey, user)))
 	})

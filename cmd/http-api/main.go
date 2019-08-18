@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/uswitch/ontology/pkg/audit"
 	"github.com/uswitch/ontology/pkg/authnz"
 )
 
@@ -24,7 +25,7 @@ func apiHandler(config *Config) (http.Handler, error) {
 
 	apiMux := http.NewServeMux()
 
-	return oidcAuth.Middleware(AuditMiddleware(auditLogger, apiMux)), nil
+	return oidcAuth.Middleware(audit.AuditMiddleware(auditLogger, apiMux)), nil
 }
 
 func opsHandler(config *Config) (http.Handler, error) {

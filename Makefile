@@ -4,6 +4,7 @@
 all: bin/http-api
 
 test:
+	go test github.com/uswitch/ontology/pkg/audit
 	go test github.com/uswitch/ontology/pkg/authnz
 	go test github.com/uswitch/ontology/pkg/store
 	go test github.com/uswitch/ontology/cmd/http-api

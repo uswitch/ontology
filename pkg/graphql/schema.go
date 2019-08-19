@@ -1,11 +1,8 @@
 package graphql
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log"
-	"math/bits"
-	"strconv"
 
 	"github.com/graphql-go/graphql"
 
@@ -180,118 +177,18 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 		},
 	})
 
-	type Page struct {
-		Cursor string
-		Limit  int
-	}
-
-	pageType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "Page",
-		Description: "Information about a page",
-		Fields: graphql.Fields{
-			"cursor": &graphql.Field{
-				Type: graphql.String,
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					page, ok := p.Source.(Page)
-					if !ok {
-						return nil, fmt.Errorf("Not a page")
-					}
-
-					return page.Cursor, nil
-				},
-			},
-			"limit": &graphql.Field{
-				Type: graphql.Int,
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					page, ok := p.Source.(Page)
-					if !ok {
-						return nil, fmt.Errorf("Not a page")
-					}
-
-					return page.Limit, nil
-				},
-			},
-		},
-	})
-
-	type RelatedEntityPage struct {
-		Page
-		List []*relatedEntity
-	}
-
-	relatedEntityPageType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "RelatedEntityPage",
-		Description: "An page of related entities",
-		Fields: graphql.Fields{
-			"list": &graphql.Field{
-				Type: graphql.NewList(relatedEntityType),
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					relEntPage, ok := p.Source.(*RelatedEntityPage)
-					if !ok {
-						return nil, fmt.Errorf("Not a RelatedEntityPage: %v", p.Source)
-					}
-
-					return relEntPage.List, nil
-				},
-			},
-			"page": &graphql.Field{
-				Type: pageType,
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					relEntPage, ok := p.Source.(*RelatedEntityPage)
-					if !ok {
-						return nil, fmt.Errorf("Not a RelatedEntityPage: %v", p.Source)
-					}
-
-					return relEntPage.Page, nil
-				},
-			},
-		},
-	})
+	relatedEntityPageType := NewPaginatedList(relatedEntityType)
 
 	entityType.AddFieldConfig("relatedEntities", &graphql.Field{
 		Type: relatedEntityPageType,
-		Args: graphql.FieldConfigArgument{
-			"limit": &graphql.ArgumentConfig{
-				Type:         graphql.Int,
-				DefaultValue: int(store.DefaultNumberOfResults),
-			},
-			"cursor": &graphql.ArgumentConfig{
-				Type: graphql.String,
-			},
-		},
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+		Args: PageArgs,
+		Resolve: ResolvePage(func(listOptions store.ListOptions, p graphql.ResolveParams) (interface{}, error) {
 			thing, ok := p.Source.(*store.Thing)
 			if !ok {
 				return nil, fmt.Errorf("Not an thing: %v", p.Source)
 			}
 
 			entity := (*store.Entity)(thing)
-
-			limit := p.Args["limit"].(int)
-			cursor, cursorOk := p.Args["cursor"].(string)
-
-			offset := uint(0)
-
-			if cursorOk {
-				decodedCursor, err := base64.StdEncoding.DecodeString(cursor)
-				if err != nil {
-					return nil, err
-				}
-
-				offset64, err := strconv.ParseUint(string(decodedCursor), 10, bits.UintSize)
-				if err != nil {
-					return nil, err
-				}
-
-				offset = uint(offset64)
-			}
-
-			listOptions := store.ListOptions{
-				SortOrder:       store.SortAscending,
-				SortField:       store.SortByID,
-				Offset:          offset,
-				NumberOfResults: uint(limit),
-			}
 
 			var relations []*store.Relation
 			var err error
@@ -320,49 +217,11 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 				}
 			}
 
-			newOffset := offset + uint(len(relatedEntities))
-			encodedCursor := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", newOffset)))
-
-			return &RelatedEntityPage{
-				Page: Page{Cursor: encodedCursor, Limit: limit},
-				List: relatedEntities,
-			}, nil
-		},
+			return (interface{})(relatedEntities), nil
+		}),
 	})
 
-	type ThingPage struct {
-		Page
-		List []*store.Thing
-	}
-
-	thingPageType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "ThingPage",
-		Description: "A page of things",
-		Fields: graphql.Fields{
-			"list": &graphql.Field{
-				Type: graphql.NewList(thingInterface),
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					thingPage, ok := p.Source.(*ThingPage)
-					if !ok {
-						return nil, fmt.Errorf("Not a ThingPage: %v", p.Source)
-					}
-
-					return thingPage.List, nil
-				},
-			},
-			"page": &graphql.Field{
-				Type: pageType,
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					thingPage, ok := p.Source.(*ThingPage)
-					if !ok {
-						return nil, fmt.Errorf("Not a ThingPage: %v", p.Source)
-					}
-
-					return thingPage.Page, nil
-				},
-			},
-		},
-	})
+	thingPageType := NewPaginatedList(thingInterface)
 
 	rootQuery := graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
@@ -380,48 +239,16 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 			},
 			"things": &graphql.Field{
 				Type: thingPageType,
-				Args: graphql.FieldConfigArgument{
+				Args: PageArgsWith(graphql.FieldConfigArgument{
 					"type": &graphql.ArgumentConfig{
 						Type: graphql.ID,
 					},
-					"limit": &graphql.ArgumentConfig{
-						Type:         graphql.Int,
-						DefaultValue: int(store.DefaultNumberOfResults),
-					},
-					"cursor": &graphql.ArgumentConfig{
-						Type: graphql.String,
-					},
-				},
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					typeID, ok := p.Args["type"].(string)
-					limit := p.Args["limit"].(int)
-					cursor, cursorOk := p.Args["cursor"].(string)
-
-					offset := uint(0)
-
-					if cursorOk {
-						decodedCursor, err := base64.StdEncoding.DecodeString(cursor)
-						if err != nil {
-							return nil, err
-						}
-
-						offset64, err := strconv.ParseUint(string(decodedCursor), 10, bits.UintSize)
-						if err != nil {
-							return nil, err
-						}
-
-						offset = uint(offset64)
-					}
-
-					listOptions := store.ListOptions{
-						SortOrder:       store.SortAscending,
-						SortField:       store.SortByID,
-						Offset:          offset,
-						NumberOfResults: uint(limit),
-					}
-
+				}),
+				Resolve: ResolvePage(func(listOptions store.ListOptions, p graphql.ResolveParams) (interface{}, error) {
 					var things []*store.Thing
 					var err error
+
+					typeID, ok := p.Args["type"].(string)
 
 					if !ok {
 						things, err = s.List(listOptions)
@@ -434,18 +261,8 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 						things, err = s.ListByType(typ, listOptions)
 					}
 
-					if err != nil {
-						return nil, err
-					}
-
-					newOffset := offset + uint(len(things))
-					encodedCursor := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", newOffset)))
-
-					return &ThingPage{
-						Page: Page{Cursor: encodedCursor, Limit: limit},
-						List: things,
-					}, nil
-				},
+					return (interface{})(things), err
+				}),
 			},
 		},
 	})

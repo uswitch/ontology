@@ -3,6 +3,7 @@ package graphql
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/graphql-go/graphql"
 
@@ -61,7 +62,7 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 						return nil, fmt.Errorf("Not metadata")
 					}
 
-					return metadata.UpdatedAt.String(), nil
+					return metadata.UpdatedAt.Format(time.RFC3339), nil
 				},
 			},
 		},

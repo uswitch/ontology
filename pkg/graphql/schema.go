@@ -1,4 +1,4 @@
-package main
+package graphql
 
 import (
 	"encoding/base64"
@@ -12,7 +12,7 @@ import (
 	"github.com/uswitch/ontology/pkg/store"
 )
 
-func NewGraphQLSchema(s store.Store) (*graphql.Schema, error) {
+func NewSchema(s store.Store) (*graphql.Schema, error) {
 	var entityType, relationType, typeType *graphql.Object
 
 	metadataType := graphql.NewObject(graphql.ObjectConfig{

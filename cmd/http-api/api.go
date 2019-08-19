@@ -10,6 +10,7 @@ import (
 
 	"github.com/uswitch/ontology/pkg/audit"
 	"github.com/uswitch/ontology/pkg/authnz"
+	"github.com/uswitch/ontology/pkg/graphql"
 	"github.com/uswitch/ontology/pkg/middleware"
 	"github.com/uswitch/ontology/pkg/store"
 )
@@ -52,7 +53,7 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 		}
 	})
 
-	schema, err := NewGraphQLSchema(s)
+	schema, err := graphql.NewSchema(s)
 	if err != nil {
 		return nil, err
 	}

@@ -32,22 +32,25 @@ func (s *inmemStore) Len() (int, error) {
 	return len(s.things), nil
 }
 
-func (s *inmemStore) Add(things ...*Thing) error {
+func (s *inmemStore) Add(things ...Thingable) error {
 	return s.AddAll(things)
 }
 
-func (s *inmemStore) AddAll(things []*Thing) error {
+func (s *inmemStore) AddAll(things []Thingable) error {
 	s.rw.Lock()
 	defer s.rw.Unlock()
 
-	for _, thing := range things {
+	for _, thingable := range things {
+		thing := thingable.Thing()
 		s.things[thing.ID] = thing
 	}
 
 	return nil
 }
 
-func (s *inmemStore) IsA(thing *Thing, t *Type) (bool, error) {
+func (s *inmemStore) IsA(thingable Thingable, t *Type) (bool, error) {
+	thing := thingable.Thing()
+
 	if t == TypeType {
 		return thing.Metadata.Type == t.Metadata.ID, nil
 	}

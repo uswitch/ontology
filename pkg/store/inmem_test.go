@@ -130,12 +130,12 @@ func TestAddAndGet(t *testing.T) {
 func TestGetCorrectType(t *testing.T) {
 	store := NewInMemoryStore()
 
-	if err := store.AddAll([]*Thing{
+	if err := store.Add(
 		entity("/wibble/bibble/1"),
 		relation("/wibble/bibble/2"),
 		ntype("/wibble/bibble/3"),
 		thingWithType("/wibble/bibble/4", "/type/", nil),
-	}); err != nil {
+	); err != nil {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
 
@@ -296,14 +296,14 @@ func TestListRelationsForEntity(t *testing.T) {
 
 	ent1 := entity("/ent/1")
 
-	if err := store.AddAll([]*Thing{
+	if err := store.Add(
 		ent1,
 		entity("/ent/2"),
 		entity("/ent/3"),
 		relationBetween("/rel/1", "/ent/1", "/ent/2"),
 		relationBetween("/rel/2", "/ent/3", "/ent/1"),
 		relationBetween("/rel/3", "/ent/2", "/ent/3"),
-	}); err != nil {
+	); err != nil {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
 
@@ -431,13 +431,13 @@ func convertTypesToThings(listFunc func(ListOptions) ([]*Type, error)) func(List
 func TestListByType(t *testing.T) {
 	store := NewInMemoryStore()
 
-	if err := store.AddAll([]*Thing{
+	if err := store.Add(
 		entity("/wibble/bibble/1"),
 		entity("/wibble/bibble/5"),
 		entity("/wibble/bibble/4"),
 		relation("/wibble/bibble/3"),
 		relation("/wibble/bibble/6"),
-	}); err != nil {
+	); err != nil {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
 

@@ -118,12 +118,12 @@ type ListOptions struct {
 }
 
 type Store interface {
-	Add(...*Thing) error
-	AddAll([]*Thing) error
+	Add(...Thingable) error
+	AddAll([]Thingable) error
 
 	Len() (int, error)
 
-	IsA(*Thing, *Type) (bool, error)
+	IsA(Thingable, *Type) (bool, error)
 
 	GetByID(ID) (*Thing, error)
 	GetEntityByID(ID) (*Entity, error)

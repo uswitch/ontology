@@ -77,6 +77,26 @@ var (
 			ID:   ID("/type"),
 			Type: ID("/type"),
 		},
+		Properties: Properties{
+			"spec": map[string]interface{}{
+				"parent": map[string]string{
+					"type": "string",
+					"pointer_to": "/type",
+				},
+				"template": map[string]string{
+					"type": "string",
+				},
+				"spec": map[string]string{
+					"type": "object",
+				},
+				"required": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "string",
+					},
+				},
+			},
+		},
 	}
 
 	EntityType = &Type{
@@ -90,6 +110,19 @@ var (
 		Metadata: Metadata{
 			ID:   ID("/relation"),
 			Type: ID("/type"),
+		},
+		Properties: Properties{
+			"spec": map[string]interface{}{
+				"a": map[string]string{
+					"type": "string",
+					"pointer_to": "/entity",
+				},
+				"b": map[string]string{
+					"type": "string",
+					"pointer_to": "/entity",
+				},
+			},
+			"required": []string{"a", "b"},
 		},
 	}
 )
@@ -117,6 +150,23 @@ type ListOptions struct {
 	NumberOfResults uint
 }
 
+
+type PointerOptions int
+const (
+	ResolvePointers = PointerOptions(iota)
+	IgnorePointers
+)
+
+type ValidateOptions struct {
+	Pointers PointerOptions
+}
+
+type ValidationError string
+
+func (e ValidationError) Error() string {
+	return string(e)
+}
+
 type Store interface {
 	Add(...Thingable) error
 	AddAll([]Thingable) error
@@ -124,6 +174,7 @@ type Store interface {
 	Len() (int, error)
 
 	IsA(Thingable, *Type) (bool, error)
+	Validate(Thingable, ValidateOptions) ([]ValidationError, error)
 
 	GetByID(ID) (*Thing, error)
 	GetEntityByID(ID) (*Entity, error)

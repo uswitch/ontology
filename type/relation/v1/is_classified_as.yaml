@@ -3,12 +3,11 @@ metadata:
 properties:
   parent: /relation/v1
   template: "{{{ a }}} is classified as {{{ b }}}"
+  required: ["a", "b"]
   spec:
     a:
       type: string
       pointer_to: /entity/v1
-      required: true
     b:
       type: string
       pointer_to: /entity/v1/classification
-      required: true

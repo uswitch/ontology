@@ -4,16 +4,15 @@
     },
     "properties": {
         "parent": "/relation",
+        "required": ["a", "b"],
         "spec": {
             "a": {
                 "type": "string",
-                "pointer_to": "/entity/v1",
-                "required": true
+                "pointer_to": "/entity/v1"
             },
             "b": {
                 "type": "string",
-                "pointer_to": "/entity/v1",
-                "required": true
+                "pointer_to": "/entity/v1"
             }
         }
     }

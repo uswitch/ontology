@@ -79,6 +79,10 @@ func (s *inmemStore) IsA(thingable Thingable, t *Type) (bool, error) {
 	return false, nil
 }
 
+func (s *inmemStore) Validate(t Thingable, opts ValidateOptions) ([]ValidationError, error) {
+	return validate(s, t, opts)
+}
+
 func (s *inmemStore) GetByID(id ID) (*Thing, error) {
 	s.rw.RLock()
 	defer s.rw.RUnlock()

@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func thingWithType(thingID string, typeID string, properties *Properties) *Thing {
+func thingWithType(thingID string, typeID string, properties Properties) *Thing {
 	thing := &Thing{
 		Metadata: Metadata{
 			ID:   ID(thingID),
@@ -13,18 +13,32 @@ func thingWithType(thingID string, typeID string, properties *Properties) *Thing
 	}
 
 	if properties != nil {
-		thing.Properties = *properties
+		thing.Properties = properties
 	}
 
 	return thing
 }
 func entity(ID string) *Thing   { return thingWithType(ID, "/entity", nil) }
+func entityWithType(ID, typ string) *Thing   { return thingWithType(ID, typ, nil) }
 func relation(ID string) *Thing { return thingWithType(ID, "/relation", nil) }
 func ntype(ID string) *Thing    { return thingWithType(ID, "/type", nil) }
+func typ(ID, parent string, spec map[string]interface{}) *Type {
+	props := Properties{}
+
+	if parent != "" {
+		props["parent"] = parent
+	}
+	props["spec"] = spec
+
+	return (*Type)(thingWithType(ID, "/type", props))
+}
 func relationBetween(ID, a, b string) *Thing {
+	return relationBetweenWithType(ID, "/relation", a, b)
+}
+func relationBetweenWithType(ID, typ, a, b string) *Thing {
 	return thingWithType(
-		ID, "/relation",
-		&Properties{
+		ID, typ,
+		Properties{
 			"a": a,
 			"b": b,
 		},

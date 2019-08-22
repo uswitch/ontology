@@ -17,28 +17,34 @@ import (
 )
 
 type RequestOptions struct {
-    Query         string                 `json:"query" url:"query" schema:"query"`
-    Variables     map[string]interface{} `json:"variables" url:"variables" schema:"variables"`
-    OperationName string                 `json:"operationName" url:"operationName" schema:"operationName"`
+	Query         string                 `json:"query" url:"query" schema:"query"`
+	Variables     map[string]interface{} `json:"variables" url:"variables" schema:"variables"`
+	OperationName string                 `json:"operationName" url:"operationName" schema:"operationName"`
 }
 
 func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Logger, cors middleware.Middleware) (http.Handler, error) {
 	apiMux := http.NewServeMux()
 
 	apiMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if ! (r.Method == "POST" || r.Method == "PUT") {
+		if !(r.Method == "POST" || r.Method == "PUT") {
 			w.WriteHeader(405)
 			return
 		}
 
-		thingsAdded := []store.ID{}
+		thingsToAdd := []*store.Thing{}
 		defer func() {
-			auditLogger.Log(r.Context(), audit.AuditData{"thingsAdded": thingsAdded})
+			auditLogger.Log(r.Context(), audit.AuditData{"thingsAdded": len(thingsToAdd)})
 		}()
+
+		validateOptions := store.ValidateOptions{}
+
+		if r.URL.Query().Get("ignore_missing_pointers") != "" {
+			validateOptions.Pointers = store.IgnoreMissingPointers
+		}
 
 		decoder := json.NewDecoder(r.Body)
 
-		for ;; {
+		for {
 			var thing store.Thing
 
 			if err := decoder.Decode(&thing); err == io.EOF {
@@ -49,13 +55,23 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 				return
 			}
 
-			if err := s.Add(&thing); err != nil {
-				log.Printf("coudln't add thing to store: %v", err)
+			if errors, err := s.Validate(&thing, validateOptions); err != nil {
+				log.Printf("coudln't validate thing: %v", err)
+				w.WriteHeader(500)
+				return
+			} else if len(errors) > 0 {
+				log.Printf("rejected: %v", thing.Metadata.ID)
+			} else {
+				thingsToAdd = append(thingsToAdd, &thing)
+			}
+		}
+
+		for _, thing := range thingsToAdd {
+			if err := s.Add(thing); err != nil {
+				log.Printf("coudln't add thing: %v", err)
 				w.WriteHeader(500)
 				return
 			}
-
-			thingsAdded = append(thingsAdded, thing.Metadata.ID)
 		}
 	})
 
@@ -88,8 +104,8 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 		ctx := r.Context()
 
 		auditLogger.Log(ctx, audit.AuditData{
-			"query": opts.Query,
-			"variables": opts.Variables,
+			"query":          opts.Query,
+			"variables":      opts.Variables,
 			"operation_name": opts.OperationName,
 		})
 

@@ -143,7 +143,7 @@ func validate(s Store, thingable Thingable, options ValidateOptions) ([]Validati
 		// this is a bit of a hack as we won't have the store available when
 		// we are running PointerTo.Validate. This lets us defer the resolution
 		if error.RulePath == resolutionPath {
-			if options.Pointers == IgnorePointers {
+			if options.Pointers == IgnoreAllPointers {
 				continue
 			}
 
@@ -152,23 +152,25 @@ func validate(s Store, thingable Thingable, options ValidateOptions) ([]Validati
 				return nil, fmt.Errorf("Failed to get a resolution pair from: %v", error.InvalidValue)
 			}
 
-			thing, err := s.GetByID(pair.ID)
-			if err == ErrNotFound {
-				validationErrors = append(
-					validationErrors,
-					ValidationError(fmt.Sprintf("could not find thing %s", string(pair.ID))),
-				)
-				continue
-			} else if err != nil {
-				return nil, err
-			}
-
 			typ, err := s.GetTypeByID(pair.Type)
 			if err == ErrNotFound {
 				validationErrors = append(
 					validationErrors,
 					ValidationError(fmt.Sprintf("could not find type %s", string(pair.ID))),
 				)
+				continue
+			} else if err != nil {
+				return nil, err
+			}
+
+			thing, err := s.GetByID(pair.ID)
+			if err == ErrNotFound {
+				if options.Pointers != IgnoreMissingPointers {
+					validationErrors = append(
+						validationErrors,
+						ValidationError(fmt.Sprintf("could not find thing %s", string(pair.ID))),
+					)
+				}
 				continue
 			} else if err != nil {
 				return nil, err

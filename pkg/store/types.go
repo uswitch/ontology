@@ -154,7 +154,8 @@ type ListOptions struct {
 type PointerOptions int
 const (
 	ResolvePointers = PointerOptions(iota)
-	IgnorePointers
+	IgnoreMissingPointers
+	IgnoreAllPointers
 )
 
 type ValidateOptions struct {

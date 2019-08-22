@@ -89,8 +89,12 @@ func TestValidate(t *testing.T) {
 	} else if len(valErrs) != 1 {
 		t.Errorf("Expected 1 validation error, got %d: %v", len(valErrs), valErrs)
 	}
-
-	if valErrs, err := store.Validate(wrongwayroundRel, ValidateOptions{Pointers: IgnorePointers}); err != nil {
+	if valErrs, err := store.Validate(wrongwayroundRel, ValidateOptions{Pointers: IgnoreMissingPointers}); err != nil {
+		t.Errorf("Failed to validate thing: %v", err)
+	} else if len(valErrs) != 1 {
+		t.Errorf("Expected 1 validation error, got %d: %v", len(valErrs), valErrs)
+	}
+	if valErrs, err := store.Validate(wrongwayroundRel, ValidateOptions{Pointers: IgnoreAllPointers}); err != nil {
 		t.Errorf("Failed to validate thing: %v", err)
 	} else if len(valErrs) != 0 {
 		t.Errorf("Expected 0 validation errors, got %d: %v", len(valErrs), valErrs)
@@ -101,6 +105,18 @@ func TestValidate(t *testing.T) {
 		t.Errorf("Failed to validate thing: %v", err)
 	} else if len(valErrs) == 0 {
 		t.Errorf("Expected more than 0 validation errors, got %d: %v", len(valErrs), valErrs)
+	}
+
+	missingRel := relationBetweenWithType("/qwer", "/relation/wibble", "/unknown-entity", "/asdf")
+	if valErrs, err := store.Validate(missingRel, ValidateOptions{}); err != nil {
+		t.Errorf("Failed to validate thing: %v", err)
+	} else if len(valErrs) != 1 {
+		t.Errorf("Expected 1 validation error, got %d: %v", len(valErrs), valErrs)
+	}
+	if valErrs, err := store.Validate(missingRel, ValidateOptions{Pointers: IgnoreMissingPointers}); err != nil {
+		t.Errorf("Failed to validate thing: %v", err)
+	} else if len(valErrs) != 0 {
+		t.Errorf("Expected 0 validation errors, got %d: %v", len(valErrs), valErrs)
 	}
 
 }

@@ -10,10 +10,9 @@ import (
 	"github.com/uswitch/ontology/pkg/store"
 )
 
-func NewSchema(s store.Store) (*graphql.Schema, error) {
-	var entityType, relationType, typeType *graphql.Object
+var (
 
-	metadataType := graphql.NewObject(graphql.ObjectConfig{
+	metadataType = graphql.NewObject(graphql.ObjectConfig{
 		Name:        "Metadata",
 		Description: "Metadata about any thing",
 		Fields: graphql.Fields{
@@ -68,7 +67,7 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 		},
 	})
 
-	metadataField := &graphql.Field{
+	metadataField = &graphql.Field{
 		Type:        metadataType,
 		Description: "Metadata for this thing",
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
@@ -82,6 +81,11 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 			return thing.Metadata, nil
 		},
 	}
+
+)
+
+func NewSchema(s store.Store) (*graphql.Schema, error) {
+	var entityType, relationType, typeType *graphql.Object
 
 	thingInterface := graphql.NewInterface(graphql.InterfaceConfig{
 		Name:        "Thing",

@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -20,7 +21,7 @@ func nameFromID(id string) string {
 	return out
 }
 
-func objectFromType(s store.Store, typ *store.Type) (*graphql.Object, error) {
+func objectFromType(ctx context.Context, s store.Store, typ *store.Type) (*graphql.Object, error) {
 
 	fields := graphql.Fields{
 		"metadata": metadataField,
@@ -52,7 +53,7 @@ func objectFromType(s store.Store, typ *store.Type) (*graphql.Object, error) {
 		if nextTypeID, ok := currType.Properties["parent"]; !ok {
 			break
 		} else {
-			nextType, err := s.GetTypeByID(store.ID(nextTypeID.(string)))
+			nextType, err := s.GetTypeByID(ctx, store.ID(nextTypeID.(string)))
 			if err != nil {
 				return nil, err
 			}

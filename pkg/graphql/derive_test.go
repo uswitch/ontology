@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"context"
 	"testing"
 
 	"github.com/uswitch/ontology/pkg/store/inmem"
@@ -25,6 +26,7 @@ func TestDeriveName(t *testing.T) {
 
 func TestDeriveObjectFromType(t *testing.T) {
 	s := inmem.NewInMemoryStore()
+	ctx := context.Background()
 
 	entityType := storetest.Type("/entity/wibble", "/entity", map[string]interface{}{
 		"data": map[string]interface{}{
@@ -32,9 +34,9 @@ func TestDeriveObjectFromType(t *testing.T) {
 		},
 	})
 
-	s.Add(entityType)
+	s.Add(ctx, entityType)
 
-	graphqlObject, err := objectFromType(s, entityType)
+	graphqlObject, err := objectFromType(ctx, s, entityType)
 	if err != nil {
 		t.Fatalf("Failed to make object: %v", err)
 	}

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,7 +52,7 @@ func init() {
 	jsonschema.RegisterValidator("pointer_to", NewPointerTo)
 }
 
-func typeProperties(s Store, typ *Type) (jsonschema.Properties, jsonschema.Required, error) {
+func typeProperties(ctx context.Context, s Store, typ *Type) (jsonschema.Properties, jsonschema.Required, error) {
 	props := jsonschema.Properties{}
 	requiredSet := map[string]struct{}{}
 
@@ -86,7 +87,7 @@ func typeProperties(s Store, typ *Type) (jsonschema.Properties, jsonschema.Requi
 		if nextTypeID, ok := currType.Properties["parent"]; !ok {
 			break
 		} else {
-			nextType, err := s.GetTypeByID(ID(nextTypeID.(string)))
+			nextType, err := s.GetTypeByID(ctx, ID(nextTypeID.(string)))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -105,15 +106,15 @@ func typeProperties(s Store, typ *Type) (jsonschema.Properties, jsonschema.Requi
 	return props, jsonschema.Required(required), nil
 }
 
-func validate(s Store, thingable Thingable, options ValidateOptions) ([]ValidationError, error) {
+func validate(ctx context.Context, s Store, thingable Thingable, options ValidateOptions) ([]ValidationError, error) {
 	thing := thingable.Thing()
 
-	typ, err := s.GetTypeByID(thing.Metadata.Type)
+	typ, err := s.GetTypeByID(ctx, thing.Metadata.Type)
 	if err != nil {
 		return nil, err
 	}
 
-	propsSchema, requiredProps, err := typeProperties(s, typ)
+	propsSchema, requiredProps, err := typeProperties(ctx, s, typ)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +153,7 @@ func validate(s Store, thingable Thingable, options ValidateOptions) ([]Validati
 				return nil, fmt.Errorf("Failed to get a resolution pair from: %v", error.InvalidValue)
 			}
 
-			typ, err := s.GetTypeByID(pair.Type)
+			typ, err := s.GetTypeByID(ctx, pair.Type)
 			if err == ErrNotFound {
 				validationErrors = append(
 					validationErrors,
@@ -163,7 +164,7 @@ func validate(s Store, thingable Thingable, options ValidateOptions) ([]Validati
 				return nil, err
 			}
 
-			thing, err := s.GetByID(pair.ID)
+			thing, err := s.GetByID(ctx, pair.ID)
 			if err == ErrNotFound {
 				if options.Pointers != IgnoreMissingPointers {
 					validationErrors = append(
@@ -176,7 +177,7 @@ func validate(s Store, thingable Thingable, options ValidateOptions) ([]Validati
 				return nil, err
 			}
 
-			typeMatches, err := s.IsA(thing, typ)
+			typeMatches, err := s.IsA(ctx, thing, typ)
 			if err != nil {
 				return nil, err
 			}

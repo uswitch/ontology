@@ -21,25 +21,27 @@ func NewInMemoryStore() Store {
 		broadcast: newBroadcast(),
 	}
 
-	store.Add(TypeType.Thing())
-	store.Add(EntityType.Thing())
-	store.Add(RelationType.Thing())
+	ctx := context.TODO()
+
+	store.Add(ctx, TypeType.Thing())
+	store.Add(ctx, EntityType.Thing())
+	store.Add(ctx, RelationType.Thing())
 
 	return store
 }
 
-func (s *inmemStore) Len() (int, error) {
+func (s *inmemStore) Len(_ context.Context) (int, error) {
 	s.rw.Lock()
 	defer s.rw.Unlock()
 
 	return len(s.things), nil
 }
 
-func (s *inmemStore) Add(things ...Thingable) error {
-	return s.AddAll(things)
+func (s *inmemStore) Add(ctx context.Context, things ...Thingable) error {
+	return s.AddAll(ctx, things)
 }
 
-func (s *inmemStore) AddAll(things []Thingable) error {
+func (s *inmemStore) AddAll(ctx context.Context, things []Thingable) error {
 	s.rw.Lock()
 	for _, thingable := range things {
 		thing := thingable.Thing()
@@ -54,13 +56,13 @@ func (s *inmemStore) AddAll(things []Thingable) error {
 		// we don't want to enforce validation, but we can't broadcast
 		// if we don't know the types
 		if ! thing.Equal(TypeType, EntityType, RelationType) {
-			if types, err := s.Types(thingable); err == nil {
+			if types, err := s.Types(ctx, thingable); err == nil {
 				typeIDs := make([]ID, len(types))
 				for idx, typ := range types {
 					typeIDs[idx] = typ.Metadata.ID
 				}
 
-				s.broadcast.Send(context.TODO(), thingable, typeIDs...)
+				s.broadcast.Send(ctx, thingable, typeIDs...)
 			}
 		}
 	}
@@ -68,14 +70,14 @@ func (s *inmemStore) AddAll(things []Thingable) error {
 	return nil
 }
 
-func (s *inmemStore) Types(thingable Thingable) ([]*Type, error) {
+func (s *inmemStore) Types(ctx context.Context, thingable Thingable) ([]*Type, error) {
 	thing := thingable.Thing()
 
 	types := []*Type{}
 	thingTypeID := thing.Metadata.Type
 
 	for {
-		thingType, err := s.GetTypeByID(thingTypeID)
+		thingType, err := s.GetTypeByID(ctx, thingTypeID)
 		if err != nil {
 			return nil, err
 		}
@@ -94,12 +96,12 @@ func (s *inmemStore) Types(thingable Thingable) ([]*Type, error) {
 	return types, nil
 }
 
-func (s *inmemStore) IsA(thingable Thingable, t *Type) (bool, error) {
+func (s *inmemStore) IsA(ctx context.Context, thingable Thingable, t *Type) (bool, error) {
 	if t == TypeType {
 		return thingable.Thing().Metadata.Type == t.Metadata.ID, nil
 	}
 
-	types, err := s.Types(thingable)
+	types, err := s.Types(ctx, thingable)
 	if err != nil {
 		return false, err
 	}
@@ -113,11 +115,11 @@ func (s *inmemStore) IsA(thingable Thingable, t *Type) (bool, error) {
 	return false, nil
 }
 
-func (s *inmemStore) Validate(t Thingable, opts ValidateOptions) ([]ValidationError, error) {
-	return validate(s, t, opts)
+func (s *inmemStore) Validate(ctx context.Context, t Thingable, opts ValidateOptions) ([]ValidationError, error) {
+	return validate(ctx, s, t, opts)
 }
 
-func (s *inmemStore) GetByID(id ID) (*Thing, error) {
+func (s *inmemStore) GetByID(ctx context.Context, id ID) (*Thing, error) {
 	s.rw.RLock()
 	thing, ok := s.things[id]
 	s.rw.RUnlock()
@@ -129,14 +131,14 @@ func (s *inmemStore) GetByID(id ID) (*Thing, error) {
 	}
 }
 
-func (s *inmemStore) GetEntityByID(id ID) (*Entity, error) {
+func (s *inmemStore) GetEntityByID(ctx context.Context, id ID) (*Entity, error) {
 	s.rw.RLock()
 	thing, ok := s.things[id]
 	s.rw.RUnlock()
 
 	if !ok {
 		return nil, ErrNotFound
-	} else if ok, err := s.IsA(thing, EntityType); !ok {
+	} else if ok, err := s.IsA(ctx, thing, EntityType); !ok {
 		return nil, ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -145,14 +147,14 @@ func (s *inmemStore) GetEntityByID(id ID) (*Entity, error) {
 	}
 }
 
-func (s *inmemStore) GetRelationByID(id ID) (*Relation, error) {
+func (s *inmemStore) GetRelationByID(ctx context.Context, id ID) (*Relation, error) {
 	s.rw.RLock()
 	thing, ok := s.things[id]
 	s.rw.RUnlock()
 
 	if !ok {
 		return nil, ErrNotFound
-	} else if ok, err := s.IsA(thing, RelationType); !ok {
+	} else if ok, err := s.IsA(ctx, thing, RelationType); !ok {
 		return nil, ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -161,14 +163,14 @@ func (s *inmemStore) GetRelationByID(id ID) (*Relation, error) {
 	}
 }
 
-func (s *inmemStore) GetTypeByID(id ID) (*Type, error) {
+func (s *inmemStore) GetTypeByID(ctx context.Context, id ID) (*Type, error) {
 	s.rw.RLock()
 	thing, ok := s.things[id]
 	s.rw.RUnlock()
 
 	if !ok {
 		return nil, ErrNotFound
-	} else if ok, err := s.IsA(thing, TypeType); !ok {
+	} else if ok, err := s.IsA(ctx, thing, TypeType); !ok {
 		return nil, ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -177,12 +179,12 @@ func (s *inmemStore) GetTypeByID(id ID) (*Type, error) {
 	}
 }
 
-func (s *inmemStore) List(options ListOptions) ([]*Thing, error) {
-	return s.ListByType(nil, options)
+func (s *inmemStore) List(ctx context.Context, options ListOptions) ([]*Thing, error) {
+	return s.ListByType(ctx, nil, options)
 }
 
-func (s *inmemStore) ListEntities(options ListOptions) ([]*Entity, error) {
-	things, err := s.ListByType(EntityType, options)
+func (s *inmemStore) ListEntities(ctx context.Context, options ListOptions) ([]*Entity, error) {
+	things, err := s.ListByType(ctx, EntityType, options)
 	entities := make([]*Entity, len(things))
 
 	if err != nil {
@@ -196,8 +198,8 @@ func (s *inmemStore) ListEntities(options ListOptions) ([]*Entity, error) {
 	return entities, nil
 }
 
-func (s *inmemStore) ListRelations(options ListOptions) ([]*Relation, error) {
-	things, err := s.ListByType(RelationType, options)
+func (s *inmemStore) ListRelations(ctx context.Context, options ListOptions) ([]*Relation, error) {
+	things, err := s.ListByType(ctx, RelationType, options)
 	relations := make([]*Relation, len(things))
 
 	if err != nil {
@@ -211,8 +213,8 @@ func (s *inmemStore) ListRelations(options ListOptions) ([]*Relation, error) {
 	return relations, nil
 }
 
-func (s *inmemStore) ListTypes(options ListOptions) ([]*Type, error) {
-	things, err := s.ListByType(TypeType, options)
+func (s *inmemStore) ListTypes(ctx context.Context, options ListOptions) ([]*Type, error) {
+	things, err := s.ListByType(ctx, TypeType, options)
 	types := make([]*Type, len(things))
 
 	if err != nil {
@@ -233,7 +235,7 @@ func min(x, y int) int {
 	return y
 }
 
-func (s *inmemStore) listAllByType(typ *Type) ([]*Thing, error) {
+func (s *inmemStore) listAllByType(ctx context.Context, typ *Type) ([]*Thing, error) {
 	s.rw.RLock()
 	defer s.rw.RUnlock()
 
@@ -241,7 +243,7 @@ func (s *inmemStore) listAllByType(typ *Type) ([]*Thing, error) {
 
 	for _, thing := range s.things {
 		if typ != nil {
-			if ok, err := s.IsA(thing, typ); !ok {
+			if ok, err := s.IsA(ctx, thing, typ); !ok {
 				continue
 			} else if err != nil {
 				return things, err
@@ -296,8 +298,8 @@ func (s *inmemStore) constrainList(things []*Thing, options ListOptions) ([]*Thi
 	return out, nil
 }
 
-func (s *inmemStore) ListByType(typ *Type, options ListOptions) ([]*Thing, error) {
-	things, err := s.listAllByType(typ)
+func (s *inmemStore) ListByType(ctx context.Context, typ *Type, options ListOptions) ([]*Thing, error) {
+	things, err := s.listAllByType(ctx, typ)
 	if err != nil {
 		return nil, err
 	}
@@ -305,8 +307,8 @@ func (s *inmemStore) ListByType(typ *Type, options ListOptions) ([]*Thing, error
 	return s.constrainList(things, options)
 }
 
-func (s *inmemStore) ListRelationsForEntity(entity *Entity, options ListOptions) ([]*Relation, error) {
-	allRelations, err := s.listAllByType(RelationType)
+func (s *inmemStore) ListRelationsForEntity(ctx context.Context, entity *Entity, options ListOptions) ([]*Relation, error) {
+	allRelations, err := s.listAllByType(ctx, RelationType)
 	if err != nil {
 		return nil, err
 	}

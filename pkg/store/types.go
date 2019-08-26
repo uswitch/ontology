@@ -177,28 +177,28 @@ func (e ValidationError) Error() string {
 }
 
 type Store interface {
-	Add(...Thingable) error
-	AddAll([]Thingable) error
+	Add(context.Context, ...Thingable) error
+	AddAll(context.Context, []Thingable) error
 
-	Len() (int, error)
+	Len(context.Context) (int, error)
 
-	Types(Thingable) ([]*Type, error)
-	IsA(Thingable, *Type) (bool, error)
-	Validate(Thingable, ValidateOptions) ([]ValidationError, error)
+	Types(context.Context, Thingable) ([]*Type, error)
+	IsA(context.Context, Thingable, *Type) (bool, error)
+	Validate(context.Context, Thingable, ValidateOptions) ([]ValidationError, error)
 
-	GetByID(ID) (*Thing, error)
-	GetEntityByID(ID) (*Entity, error)
-	GetRelationByID(ID) (*Relation, error)
-	GetTypeByID(ID) (*Type, error)
+	GetByID(context.Context, ID) (*Thing, error)
+	GetEntityByID(context.Context, ID) (*Entity, error)
+	GetRelationByID(context.Context, ID) (*Relation, error)
+	GetTypeByID(context.Context, ID) (*Type, error)
 
-	List(ListOptions) ([]*Thing, error)
-	ListByType(*Type, ListOptions) ([]*Thing, error)
+	List(context.Context, ListOptions) ([]*Thing, error)
+	ListByType(context.Context, *Type, ListOptions) ([]*Thing, error)
 
-	ListEntities(ListOptions) ([]*Entity, error)
-	ListRelations(ListOptions) ([]*Relation, error)
-	ListTypes(ListOptions) ([]*Type, error)
+	ListEntities(context.Context, ListOptions) ([]*Entity, error)
+	ListRelations(context.Context, ListOptions) ([]*Relation, error)
+	ListTypes(context.Context, ListOptions) ([]*Type, error)
 
-	ListRelationsForEntity(*Entity, ListOptions) ([]*Relation, error)
+	ListRelationsForEntity(context.Context, *Entity, ListOptions) ([]*Relation, error)
 
 	WatchByType(context.Context, *Type) (chan *Thing, error)
 }

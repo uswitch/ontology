@@ -49,18 +49,19 @@ func relationBetweenWithType(ID, typ, a, b string) *Thing {
 
 func TestLen(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
-	if num, err := store.Len(); err != nil {
+	if num, err := store.Len(ctx); err != nil {
 		t.Error(err)
 	} else if num != 3 {
 		t.Errorf("Store should have 3 base types, has %d", num)
 	}
 
-	if err := store.Add(entity("/wibble")); err != nil {
+	if err := store.Add(ctx, entity("/wibble")); err != nil {
 		t.Fatal(err)
 	}
 
-	if num, err := store.Len(); err != nil {
+	if num, err := store.Len(ctx); err != nil {
 		t.Error(err)
 	} else if num != 4 {
 		t.Errorf("Store should have 4 entries, has %d", num)
@@ -69,42 +70,43 @@ func TestLen(t *testing.T) {
 
 func TestIsA(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
-	if ok, err := store.IsA(EntityType.Thing(), TypeType); !ok {
+	if ok, err := store.IsA(ctx, EntityType.Thing(), TypeType); !ok {
 		t.Error("EntityType should be a TypeType")
 	} else if err != nil {
 		t.Error(err)
 	}
 
-	if ok, err := store.IsA(RelationType.Thing(), TypeType); !ok {
+	if ok, err := store.IsA(ctx, RelationType.Thing(), TypeType); !ok {
 		t.Error("RelationType should be a TypeType")
 	} else if err != nil {
 		t.Error(err)
 	}
 
-	if ok, err := store.IsA(TypeType.Thing(), TypeType); !ok {
+	if ok, err := store.IsA(ctx, TypeType.Thing(), TypeType); !ok {
 		t.Error("TypeType should be a TypeType")
 	} else if err != nil {
 		t.Error(err)
 	}
 
-	if ok, err := store.IsA(entity("/wibble/ent").Thing(), EntityType); !ok {
+	if ok, err := store.IsA(ctx, entity("/wibble/ent").Thing(), EntityType); !ok {
 		t.Error("An entity should be type EntityType")
 	} else if err != nil {
 		t.Error(err)
 	}
-	if ok, err := store.IsA(entity("/wibble/ent").Thing(), RelationType); ok {
+	if ok, err := store.IsA(ctx, entity("/wibble/ent").Thing(), RelationType); ok {
 		t.Error("An entity should not be type RelationType")
 	} else if err != nil {
 		t.Error(err)
 	}
 
-	if ok, err := store.IsA(relation("/wibble/rel").Thing(), RelationType); !ok {
+	if ok, err := store.IsA(ctx, relation("/wibble/rel").Thing(), RelationType); !ok {
 		t.Error("A relation should be type RelationType")
 	} else if err != nil {
 		t.Error(err)
 	}
-	if ok, err := store.IsA(relation("/wibble/rel").Thing(), EntityType); ok {
+	if ok, err := store.IsA(ctx, relation("/wibble/rel").Thing(), EntityType); ok {
 		t.Error("A relation should not be type EntityType")
 	} else if err != nil {
 		t.Error(err)
@@ -113,30 +115,31 @@ func TestIsA(t *testing.T) {
 
 func TestAddAndGet(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
-	if err := store.Add(entity("/wibble/bibble")); err != nil {
+	if err := store.Add(ctx, entity("/wibble/bibble")); err != nil {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
 
-	if thing, err := store.GetByID(ID("/wibble/bibble")); err != nil {
+	if thing, err := store.GetByID(ctx, ID("/wibble/bibble")); err != nil {
 		t.Error(err)
 	} else if thing.Metadata.ID != "/wibble/bibble" {
 		t.Errorf("thing had wrong ID: %s", thing.Metadata.ID)
 	}
 
-	if entity, err := store.GetEntityByID(ID("/wibble/bibble")); err != nil {
+	if entity, err := store.GetEntityByID(ctx, ID("/wibble/bibble")); err != nil {
 		t.Error(err)
 	} else if entity.Metadata.ID != "/wibble/bibble" {
 		t.Errorf("entity had wrong ID: %s", entity.Metadata.ID)
 	}
 
-	if _, err := store.GetRelationByID(ID("/wibble/bibble")); err == nil {
+	if _, err := store.GetRelationByID(ctx, ID("/wibble/bibble")); err == nil {
 		t.Errorf("should not have been able to retrieve a relation, it's an entity")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetTypeByID(ID("/wibble/bibble")); err == nil {
+	if _, err := store.GetTypeByID(ctx, ID("/wibble/bibble")); err == nil {
 		t.Errorf("should not have been able to retrieve a type, it's an entity")
 	} else if err != ErrNotFound {
 		t.Error(err)
@@ -145,8 +148,9 @@ func TestAddAndGet(t *testing.T) {
 
 func TestGetCorrectType(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
-	if err := store.Add(
+	if err := store.Add(ctx,
 		entity("/wibble/bibble/1"),
 		relation("/wibble/bibble/2"),
 		ntype("/wibble/bibble/3"),
@@ -157,17 +161,17 @@ func TestGetCorrectType(t *testing.T) {
 
 	// /wibble/bibble/1 ENTITY
 
-	if _, err := store.GetEntityByID(ID("/wibble/bibble/1")); err != nil {
+	if _, err := store.GetEntityByID(ctx, ID("/wibble/bibble/1")); err != nil {
 		t.Errorf("should have been able to retrieve an entity, it's an entity")
 	}
 
-	if _, err := store.GetRelationByID(ID("/wibble/bibble/1")); err == nil {
+	if _, err := store.GetRelationByID(ctx, ID("/wibble/bibble/1")); err == nil {
 		t.Errorf("should not have been able to retrieve a relation, it's an entity")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetTypeByID(ID("/wibble/bibble/1")); err == nil {
+	if _, err := store.GetTypeByID(ctx, ID("/wibble/bibble/1")); err == nil {
 		t.Errorf("should not have been able to retrieve a type, it's an entity")
 	} else if err != ErrNotFound {
 		t.Error(err)
@@ -175,17 +179,17 @@ func TestGetCorrectType(t *testing.T) {
 
 	// /wibble/bibble/2 RELATION
 
-	if _, err := store.GetEntityByID(ID("/wibble/bibble/2")); err == nil {
+	if _, err := store.GetEntityByID(ctx, ID("/wibble/bibble/2")); err == nil {
 		t.Errorf("should not have been able to retrieve an entity, it's an relation")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetRelationByID(ID("/wibble/bibble/2")); err != nil {
+	if _, err := store.GetRelationByID(ctx, ID("/wibble/bibble/2")); err != nil {
 		t.Errorf("should have been able to retrieve a relation, it's an relation")
 	}
 
-	if _, err := store.GetTypeByID(ID("/wibble/bibble/2")); err == nil {
+	if _, err := store.GetTypeByID(ctx, ID("/wibble/bibble/2")); err == nil {
 		t.Errorf("should not have been able to retrieve a type, it's an relation")
 	} else if err != ErrNotFound {
 		t.Error(err)
@@ -193,36 +197,36 @@ func TestGetCorrectType(t *testing.T) {
 
 	// /wibble/bibble/3 TYPE
 
-	if _, err := store.GetEntityByID(ID("/wibble/bibble/3")); err == nil {
+	if _, err := store.GetEntityByID(ctx, ID("/wibble/bibble/3")); err == nil {
 		t.Errorf("should not have been able to retrieve an entity, it's a type")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetRelationByID(ID("/wibble/bibble/3")); err == nil {
+	if _, err := store.GetRelationByID(ctx, ID("/wibble/bibble/3")); err == nil {
 		t.Errorf("should not have been able to retrieve a relation, it's a type")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetTypeByID(ID("/wibble/bibble/3")); err != nil {
+	if _, err := store.GetTypeByID(ctx, ID("/wibble/bibble/3")); err != nil {
 		t.Errorf("should have been able to retrieve a type")
 	}
 	// /wibble/bibble/3 NOT TYPE TYPE
 
-	if _, err := store.GetEntityByID(ID("/wibble/bibble/4")); err == nil {
+	if _, err := store.GetEntityByID(ctx, ID("/wibble/bibble/4")); err == nil {
 		t.Errorf("should not have been able to retrieve an entity, it's not a type")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetRelationByID(ID("/wibble/bibble/4")); err == nil {
+	if _, err := store.GetRelationByID(ctx, ID("/wibble/bibble/4")); err == nil {
 		t.Errorf("should not have been able to retrieve a relation, it's not a type")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetTypeByID(ID("/wibble/bibble/4")); err == nil {
+	if _, err := store.GetTypeByID(ctx, ID("/wibble/bibble/4")); err == nil {
 		t.Errorf("should not have been able to retrieve a type, it's not a type")
 	} else if err != ErrNotFound {
 		t.Error(err)
@@ -231,34 +235,35 @@ func TestGetCorrectType(t *testing.T) {
 
 func TestGetNotFound(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
-	if _, err := store.GetByID(ID("/wibble/bibble")); err == nil {
+	if _, err := store.GetByID(ctx, ID("/wibble/bibble")); err == nil {
 		t.Errorf("should not have been able to retrieve a thing")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetEntityByID(ID("/wibble/bibble")); err == nil {
+	if _, err := store.GetEntityByID(ctx, ID("/wibble/bibble")); err == nil {
 		t.Errorf("should not have been able to retrieve an entity")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetRelationByID(ID("/wibble/bibble")); err == nil {
+	if _, err := store.GetRelationByID(ctx, ID("/wibble/bibble")); err == nil {
 		t.Errorf("should not have been able to retrieve a relation")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 
-	if _, err := store.GetTypeByID(ID("/wibble/bibble")); err == nil {
+	if _, err := store.GetTypeByID(ctx, ID("/wibble/bibble")); err == nil {
 		t.Errorf("should not have been able to retrieve a type")
 	} else if err != ErrNotFound {
 		t.Error(err)
 	}
 }
 
-func assertList(t *testing.T, listFunc func(ListOptions) ([]*Thing, error), options ListOptions, expectedSize int, expectedIDs []string) {
-	things, err := listFunc(options)
+func assertList(t *testing.T, ctx context.Context, listFunc func(context.Context,ListOptions) ([]*Thing, error), options ListOptions, expectedSize int, expectedIDs []string) {
+	things, err := listFunc(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,12 +282,12 @@ func assertList(t *testing.T, listFunc func(ListOptions) ([]*Thing, error), opti
 	}
 }
 
-func compareLists(t *testing.T, listFunc1 func(ListOptions) ([]*Thing, error), listFunc2 func(ListOptions) ([]*Thing, error), options ListOptions) {
-	things1, err := listFunc1(options)
+func compareLists(t *testing.T, ctx context.Context, listFunc1 func(context.Context,ListOptions) ([]*Thing, error), listFunc2 func(context.Context, ListOptions) ([]*Thing, error), options ListOptions) {
+	things1, err := listFunc1(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}
-	things2, err := listFunc2(options)
+	things2, err := listFunc2(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,18 +306,20 @@ func compareLists(t *testing.T, listFunc1 func(ListOptions) ([]*Thing, error), l
 	}
 }
 
-func listRelationsForEntity(store Store, ent *Entity) func(ListOptions) ([]*Thing, error) {
-	return convertRelationsToThings(func(opts ListOptions) ([]*Relation, error) {
-		return store.ListRelationsForEntity(ent, opts)
+func listRelationsForEntity(store Store, ent *Entity) func(context.Context,ListOptions) ([]*Thing, error) {
+	return convertRelationsToThings(func(ctx context.Context,opts ListOptions) ([]*Relation, error) {
+		return store.ListRelationsForEntity(ctx, ent, opts)
 	})
 }
 
 func TestListRelationsForEntity(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
 	ent1 := entity("/ent/1")
 
 	if err := store.Add(
+		ctx,
 		ent1,
 		entity("/ent/2"),
 		entity("/ent/3"),
@@ -323,7 +330,7 @@ func TestListRelationsForEntity(t *testing.T) {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
 
-	assertList(t, listRelationsForEntity(store, (*Entity)(ent1)), ListOptions{}, 2, []string{
+	assertList(t, ctx, listRelationsForEntity(store, (*Entity)(ent1)), ListOptions{}, 2, []string{
 		"/rel/1",
 		"/rel/2",
 	})
@@ -332,13 +339,14 @@ func TestListRelationsForEntity(t *testing.T) {
 
 func TestList(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
-	if err := store.Add(entity("/wibble")); err != nil {
+	if err := store.Add(ctx, entity("/wibble")); err != nil {
 		t.Fatal(err)
 	}
 
 	// default sort order is ascending
-	assertList(t, store.List, ListOptions{}, 4, []string{
+	assertList(t, ctx, store.List, ListOptions{}, 4, []string{
 		"/entity",
 		"/relation",
 		"/type",
@@ -346,7 +354,7 @@ func TestList(t *testing.T) {
 	})
 
 	// test descending correctly works
-	assertList(t, store.List, ListOptions{SortOrder: SortDescending}, 4, []string{
+	assertList(t, ctx, store.List, ListOptions{SortOrder: SortDescending}, 4, []string{
 		"/wibble",
 		"/type",
 		"/relation",
@@ -354,7 +362,7 @@ func TestList(t *testing.T) {
 	})
 
 	// ask for too many results
-	assertList(t, store.List, ListOptions{NumberOfResults: 1000}, 4, []string{
+	assertList(t, ctx, store.List, ListOptions{NumberOfResults: 1000}, 4, []string{
 		"/entity",
 		"/relation",
 		"/type",
@@ -362,37 +370,37 @@ func TestList(t *testing.T) {
 	})
 
 	// ask for less results than are in the store
-	assertList(t, store.List, ListOptions{NumberOfResults: 2}, 2, []string{
+	assertList(t, ctx, store.List, ListOptions{NumberOfResults: 2}, 2, []string{
 		"/entity",
 		"/relation",
 	})
 
 	// offset
-	assertList(t, store.List, ListOptions{NumberOfResults: 1, Offset: 1}, 1, []string{
+	assertList(t, ctx, store.List, ListOptions{NumberOfResults: 1, Offset: 1}, 1, []string{
 		"/relation",
 	})
 
 	// offset the overlaps the end
-	assertList(t, store.List, ListOptions{NumberOfResults: 3, Offset: 3}, 1, []string{
+	assertList(t, ctx, store.List, ListOptions{NumberOfResults: 3, Offset: 3}, 1, []string{
 		"/wibble",
 	})
 
 	// ask for offset bigger than the number of things
-	assertList(t, store.List, ListOptions{Offset: 10}, 0, []string{})
+	assertList(t, ctx, store.List, ListOptions{Offset: 10}, 0, []string{})
 }
 
 // the rest of the List* functions are implemented using list by type
 // ListByType should include child types
 
-func listByType(store Store, typ *Type) func(ListOptions) ([]*Thing, error) {
-	return func(opts ListOptions) ([]*Thing, error) {
-		return store.ListByType(typ, opts)
+func listByType(store Store, typ *Type) func(context.Context,ListOptions) ([]*Thing, error) {
+	return func(ctx context.Context, opts ListOptions) ([]*Thing, error) {
+		return store.ListByType(ctx, typ, opts)
 	}
 }
 
-func convertEntitiesToThings(listFunc func(ListOptions) ([]*Entity, error)) func(ListOptions) ([]*Thing, error) {
-	return func(opts ListOptions) ([]*Thing, error) {
-		vs, err := listFunc(opts)
+func convertEntitiesToThings(listFunc func(context.Context,ListOptions) ([]*Entity, error)) func(context.Context,ListOptions) ([]*Thing, error) {
+	return func(ctx context.Context, opts ListOptions) ([]*Thing, error) {
+		vs, err := listFunc(ctx, opts)
 		if err != nil {
 			return []*Thing{}, err
 		}
@@ -408,9 +416,9 @@ func convertEntitiesToThings(listFunc func(ListOptions) ([]*Entity, error)) func
 	}
 }
 
-func convertRelationsToThings(listFunc func(ListOptions) ([]*Relation, error)) func(ListOptions) ([]*Thing, error) {
-	return func(opts ListOptions) ([]*Thing, error) {
-		vs, err := listFunc(opts)
+func convertRelationsToThings(listFunc func(context.Context,ListOptions) ([]*Relation, error)) func(context.Context,ListOptions) ([]*Thing, error) {
+	return func(ctx context.Context, opts ListOptions) ([]*Thing, error) {
+		vs, err := listFunc(ctx, opts)
 		if err != nil {
 			return []*Thing{}, err
 		}
@@ -426,9 +434,9 @@ func convertRelationsToThings(listFunc func(ListOptions) ([]*Relation, error)) f
 	}
 }
 
-func convertTypesToThings(listFunc func(ListOptions) ([]*Type, error)) func(ListOptions) ([]*Thing, error) {
-	return func(opts ListOptions) ([]*Thing, error) {
-		vs, err := listFunc(opts)
+func convertTypesToThings(listFunc func(context.Context,ListOptions) ([]*Type, error)) func(context.Context,ListOptions) ([]*Thing, error) {
+	return func(ctx context.Context, opts ListOptions) ([]*Thing, error) {
+		vs, err := listFunc(ctx, opts)
 		if err != nil {
 			return []*Thing{}, err
 		}
@@ -446,8 +454,9 @@ func convertTypesToThings(listFunc func(ListOptions) ([]*Type, error)) func(List
 
 func TestListByType(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
-	if err := store.Add(
+	if err := store.Add(ctx,
 		entity("/wibble/bibble/1"),
 		entity("/wibble/bibble/5"),
 		entity("/wibble/bibble/4"),
@@ -462,115 +471,115 @@ func TestListByType(t *testing.T) {
 	listEntities := listByType(store, EntityType)
 
 	// default sort order is ascending
-	assertList(t, listEntities, ListOptions{}, 3, []string{
+	assertList(t, ctx, listEntities, ListOptions{}, 3, []string{
 		"/wibble/bibble/1",
 		"/wibble/bibble/4",
 		"/wibble/bibble/5",
 	})
 
 	// test descending correctly works
-	assertList(t, listEntities, ListOptions{SortOrder: SortDescending}, 3, []string{
+	assertList(t, ctx, listEntities, ListOptions{SortOrder: SortDescending}, 3, []string{
 		"/wibble/bibble/5",
 		"/wibble/bibble/4",
 		"/wibble/bibble/1",
 	})
 
 	// ask for too many results
-	assertList(t, listEntities, ListOptions{NumberOfResults: 1000}, 3, []string{
+	assertList(t, ctx, listEntities, ListOptions{NumberOfResults: 1000}, 3, []string{
 		"/wibble/bibble/1",
 		"/wibble/bibble/4",
 		"/wibble/bibble/5",
 	})
 
 	// ask for less results than are in the store
-	assertList(t, listEntities, ListOptions{NumberOfResults: 2}, 2, []string{
+	assertList(t, ctx, listEntities, ListOptions{NumberOfResults: 2}, 2, []string{
 		"/wibble/bibble/1",
 		"/wibble/bibble/4",
 	})
 
 	// ask for offset bigger than the number of things
-	assertList(t, listEntities, ListOptions{Offset: 10}, 0, []string{})
+	assertList(t, ctx, listEntities, ListOptions{Offset: 10}, 0, []string{})
 
-	compareLists(t, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{})
-	compareLists(t, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{SortOrder: SortDescending})
-	compareLists(t, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{NumberOfResults: 1000})
-	compareLists(t, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{NumberOfResults: 1})
-	compareLists(t, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{Offset: 10})
+	compareLists(t, ctx, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{})
+	compareLists(t, ctx, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{SortOrder: SortDescending})
+	compareLists(t, ctx, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{NumberOfResults: 1000})
+	compareLists(t, ctx, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{NumberOfResults: 1})
+	compareLists(t, ctx, listEntities, convertEntitiesToThings(store.ListEntities), ListOptions{Offset: 10})
 
 	// RELATIONS
 
 	listRelations := listByType(store, RelationType)
 
 	// default sort order is ascending
-	assertList(t, listRelations, ListOptions{}, 2, []string{
+	assertList(t, ctx, listRelations, ListOptions{}, 2, []string{
 		"/wibble/bibble/3",
 		"/wibble/bibble/6",
 	})
 
 	// test descending correctly works
-	assertList(t, listRelations, ListOptions{SortOrder: SortDescending}, 2, []string{
+	assertList(t, ctx, listRelations, ListOptions{SortOrder: SortDescending}, 2, []string{
 		"/wibble/bibble/6",
 		"/wibble/bibble/3",
 	})
 
 	// ask for too many results
-	assertList(t, listRelations, ListOptions{NumberOfResults: 1000}, 2, []string{
+	assertList(t, ctx, listRelations, ListOptions{NumberOfResults: 1000}, 2, []string{
 		"/wibble/bibble/3",
 		"/wibble/bibble/6",
 	})
 
 	// ask for less results than are in the store
-	assertList(t, listRelations, ListOptions{NumberOfResults: 1}, 1, []string{
+	assertList(t, ctx, listRelations, ListOptions{NumberOfResults: 1}, 1, []string{
 		"/wibble/bibble/3",
 	})
 
 	// ask for offset bigger than the number of things
-	assertList(t, listRelations, ListOptions{Offset: 10}, 0, []string{})
+	assertList(t, ctx, listRelations, ListOptions{Offset: 10}, 0, []string{})
 
-	compareLists(t, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{})
-	compareLists(t, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{SortOrder: SortDescending})
-	compareLists(t, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{NumberOfResults: 1000})
-	compareLists(t, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{NumberOfResults: 1})
-	compareLists(t, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{Offset: 10})
+	compareLists(t, ctx, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{})
+	compareLists(t, ctx, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{SortOrder: SortDescending})
+	compareLists(t, ctx, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{NumberOfResults: 1000})
+	compareLists(t, ctx, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{NumberOfResults: 1})
+	compareLists(t, ctx, listRelations, convertRelationsToThings(store.ListRelations), ListOptions{Offset: 10})
 
 	// TYPES
 
 	listTypes := listByType(store, TypeType)
 
 	// default sort order is ascending
-	assertList(t, listTypes, ListOptions{}, 3, []string{
+	assertList(t, ctx, listTypes, ListOptions{}, 3, []string{
 		"/entity",
 		"/relation",
 		"/type",
 	})
 
 	// test descending correctly works
-	assertList(t, listTypes, ListOptions{SortOrder: SortDescending}, 3, []string{
+	assertList(t, ctx, listTypes, ListOptions{SortOrder: SortDescending}, 3, []string{
 		"/type",
 		"/relation",
 		"/entity",
 	})
 
 	// ask for too many results
-	assertList(t, listTypes, ListOptions{NumberOfResults: 1000}, 3, []string{
+	assertList(t, ctx, listTypes, ListOptions{NumberOfResults: 1000}, 3, []string{
 		"/entity",
 		"/relation",
 		"/type",
 	})
 
 	// ask for less results than are in the store
-	assertList(t, listTypes, ListOptions{NumberOfResults: 1}, 1, []string{
+	assertList(t, ctx, listTypes, ListOptions{NumberOfResults: 1}, 1, []string{
 		"/entity",
 	})
 
 	// ask for offset bigger than the number of things
-	assertList(t, listTypes, ListOptions{Offset: 10}, 0, []string{})
+	assertList(t, ctx, listTypes, ListOptions{Offset: 10}, 0, []string{})
 
-	compareLists(t, listTypes, convertTypesToThings(store.ListTypes), ListOptions{})
-	compareLists(t, listTypes, convertTypesToThings(store.ListTypes), ListOptions{SortOrder: SortDescending})
-	compareLists(t, listTypes, convertTypesToThings(store.ListTypes), ListOptions{NumberOfResults: 1000})
-	compareLists(t, listTypes, convertTypesToThings(store.ListTypes), ListOptions{NumberOfResults: 1})
-	compareLists(t, listTypes, convertTypesToThings(store.ListTypes), ListOptions{Offset: 10})
+	compareLists(t, ctx, listTypes, convertTypesToThings(store.ListTypes), ListOptions{})
+	compareLists(t, ctx, listTypes, convertTypesToThings(store.ListTypes), ListOptions{SortOrder: SortDescending})
+	compareLists(t, ctx, listTypes, convertTypesToThings(store.ListTypes), ListOptions{NumberOfResults: 1000})
+	compareLists(t, ctx, listTypes, convertTypesToThings(store.ListTypes), ListOptions{NumberOfResults: 1})
+	compareLists(t, ctx, listTypes, convertTypesToThings(store.ListTypes), ListOptions{Offset: 10})
 }
 
 func TestWatchByType(t *testing.T) {
@@ -604,6 +613,7 @@ func TestWatchByType(t *testing.T) {
 
 	// do some changes
 	if err := store.Add(
+		ctx,
 		ntype("/wibble"),
 		ntype("/bibble"),
 		entity("/nibble"),
@@ -628,6 +638,7 @@ func TestWatchByType(t *testing.T) {
 
 	// do some changes
 	if err := store.Add(
+		ctx,
 		ntype("/wibble/1"),
 		ntype("/bibble/1"),
 		entity("/nibble/1"),

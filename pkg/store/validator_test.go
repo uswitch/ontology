@@ -1,11 +1,13 @@
 package store
 
 import (
+	"context"
 	"testing"
 )
 
 func TestTypeProperties(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
 	relType := typ("/relation/wibble", "/relation", map[string]interface{}{
 		"a": map[string]interface{}{
@@ -17,11 +19,11 @@ func TestTypeProperties(t *testing.T) {
 		},
 	})
 
-	if err := store.Add(relType.Thing()); err != nil {
+	if err := store.Add(ctx, relType.Thing()); err != nil {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
 
-	props, requiredProps, err := typeProperties(store, relType)
+	props, requiredProps, err := typeProperties(ctx, store, relType)
 	if err != nil {
 		t.Fatalf("Couldn't get the types properties: %v", err)
 	}
@@ -56,6 +58,7 @@ func TestTypeProperties(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	store := NewInMemoryStore()
+	ctx := context.Background()
 
 	relType := typ("/relation/wibble", "/relation", map[string]interface{}{
 		"a": map[string]interface{}{
@@ -72,48 +75,48 @@ func TestValidate(t *testing.T) {
 	ent1 := entityWithType("/asdf", "/entity")
 	ent2 := entityWithType("/sdfg", "/entity/thing")
 
-	if err := store.Add(entThingType.Thing(), relType.Thing(), ent1, ent2); err != nil {
+	if err := store.Add(ctx, entThingType.Thing(), relType.Thing(), ent1, ent2); err != nil {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
 
 	validRel := relationBetweenWithType("/qwer", "/relation/wibble", "/sdfg", "/asdf")
-	if valErrs, err := store.Validate(validRel, ValidateOptions{}); err != nil {
+	if valErrs, err := store.Validate(ctx, validRel, ValidateOptions{}); err != nil {
 		t.Errorf("Failed to validate thing: %v", err)
 	} else if len(valErrs) != 0 {
 		t.Errorf("Expected 0 validation errors, got %d: %v", len(valErrs), valErrs)
 	}
 
 	wrongwayroundRel := relationBetweenWithType("/qwer", "/relation/wibble", "/asdf", "/sdfg")
-	if valErrs, err := store.Validate(wrongwayroundRel, ValidateOptions{}); err != nil {
+	if valErrs, err := store.Validate(ctx, wrongwayroundRel, ValidateOptions{}); err != nil {
 		t.Errorf("Failed to validate thing: %v", err)
 	} else if len(valErrs) != 1 {
 		t.Errorf("Expected 1 validation error, got %d: %v", len(valErrs), valErrs)
 	}
-	if valErrs, err := store.Validate(wrongwayroundRel, ValidateOptions{Pointers: IgnoreMissingPointers}); err != nil {
+	if valErrs, err := store.Validate(ctx, wrongwayroundRel, ValidateOptions{Pointers: IgnoreMissingPointers}); err != nil {
 		t.Errorf("Failed to validate thing: %v", err)
 	} else if len(valErrs) != 1 {
 		t.Errorf("Expected 1 validation error, got %d: %v", len(valErrs), valErrs)
 	}
-	if valErrs, err := store.Validate(wrongwayroundRel, ValidateOptions{Pointers: IgnoreAllPointers}); err != nil {
+	if valErrs, err := store.Validate(ctx, wrongwayroundRel, ValidateOptions{Pointers: IgnoreAllPointers}); err != nil {
 		t.Errorf("Failed to validate thing: %v", err)
 	} else if len(valErrs) != 0 {
 		t.Errorf("Expected 0 validation errors, got %d: %v", len(valErrs), valErrs)
 	}
 
 	invalidRel := thingWithType("/wert", "/relation/wibble", Properties{})
-	if valErrs, err := store.Validate(invalidRel, ValidateOptions{}); err != nil {
+	if valErrs, err := store.Validate(ctx, invalidRel, ValidateOptions{}); err != nil {
 		t.Errorf("Failed to validate thing: %v", err)
 	} else if len(valErrs) == 0 {
 		t.Errorf("Expected more than 0 validation errors, got %d: %v", len(valErrs), valErrs)
 	}
 
 	missingRel := relationBetweenWithType("/qwer", "/relation/wibble", "/unknown-entity", "/asdf")
-	if valErrs, err := store.Validate(missingRel, ValidateOptions{}); err != nil {
+	if valErrs, err := store.Validate(ctx, missingRel, ValidateOptions{}); err != nil {
 		t.Errorf("Failed to validate thing: %v", err)
 	} else if len(valErrs) != 1 {
 		t.Errorf("Expected 1 validation error, got %d: %v", len(valErrs), valErrs)
 	}
-	if valErrs, err := store.Validate(missingRel, ValidateOptions{Pointers: IgnoreMissingPointers}); err != nil {
+	if valErrs, err := store.Validate(ctx, missingRel, ValidateOptions{Pointers: IgnoreMissingPointers}); err != nil {
 		t.Errorf("Failed to validate thing: %v", err)
 	} else if len(valErrs) != 0 {
 		t.Errorf("Expected 0 validation errors, got %d: %v", len(valErrs), valErrs)

@@ -1,6 +1,8 @@
 package store
 
 import (
+	"context"
+	"sync"
 	"testing"
 )
 
@@ -569,4 +571,79 @@ func TestListByType(t *testing.T) {
 	compareLists(t, listTypes, convertTypesToThings(store.ListTypes), ListOptions{NumberOfResults: 1000})
 	compareLists(t, listTypes, convertTypesToThings(store.ListTypes), ListOptions{NumberOfResults: 1})
 	compareLists(t, listTypes, convertTypesToThings(store.ListTypes), ListOptions{Offset: 10})
+}
+
+func TestWatchByType(t *testing.T) {
+	store := NewInMemoryStore()
+
+	closedWG := sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
+
+	closedWG.Add(3)
+
+	typesList1 := []*Thing{}
+	if ch, err := store.WatchByType(ctx, TypeType); err != nil {
+		t.Fatalf("Couldn't watch type: %v", err)
+	} else {
+		go appendFromChannel(ch, &typesList1, &closedWG)
+	}
+
+	typesList2 := []*Thing{}
+	if ch, err := store.WatchByType(ctx, TypeType); err != nil {
+		t.Fatalf("Couldn't watch type: %v", err)
+	} else {
+		go appendFromChannel(ch, &typesList2, &closedWG)
+	}
+
+	entitiesList1 := []*Thing{}
+	if ch, err := store.WatchByType(ctx, EntityType); err != nil {
+		t.Fatalf("Couldn't watch entity: %v", err)
+	} else {
+		go appendFromChannel(ch, &entitiesList1, &closedWG)
+	}
+
+	// do some changes
+	if err := store.Add(
+		ntype("/wibble"),
+		ntype("/bibble"),
+		entity("/nibble"),
+	); err != nil {
+		t.Fatalf("Couldn't add the bits: %v", err)
+	}
+
+	// cancel the context
+	cancel()
+	closedWG.Wait()
+
+	// check the expected numbers
+	if expected := 2; len(typesList1) != expected {
+		t.Errorf("Expected there to be %d types, but it was %d", expected, len(typesList1))
+	}
+	if expected := 2; len(typesList2) != expected {
+		t.Errorf("Expected there to be %d types, but it was %d", expected, len(typesList2))
+	}
+	if expected := 1; len(entitiesList1) != expected {
+		t.Errorf("Expected there to be %d types, but it was %d", expected, len(entitiesList1))
+	}
+
+	// do some changes
+	if err := store.Add(
+		ntype("/wibble/1"),
+		ntype("/bibble/1"),
+		entity("/nibble/1"),
+	); err != nil {
+		t.Fatalf("Couldn't add the bits: %v", err)
+	}
+
+	// check the numbers haven't changed
+	if expected := 2; len(typesList1) != expected {
+		t.Errorf("Expected there to be %d types, but it was %d", expected, len(typesList1))
+	}
+	if expected := 2; len(typesList2) != expected {
+		t.Errorf("Expected there to be %d types, but it was %d", expected, len(typesList2))
+	}
+	if expected := 1; len(entitiesList1) != expected {
+		t.Errorf("Expected there to be %d types, but it was %d", expected, len(entitiesList1))
+	}
+
 }

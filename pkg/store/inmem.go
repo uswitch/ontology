@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 type inmemStore struct {
 	things map[ID]*Thing
+	broadcast *broadcast
 
 	rw sync.RWMutex
 }
@@ -16,6 +18,7 @@ type inmemStore struct {
 func NewInMemoryStore() Store {
 	store := &inmemStore{
 		things: map[ID]*Thing{},
+		broadcast: newBroadcast(),
 	}
 
 	store.Add(TypeType.Thing())
@@ -38,41 +41,67 @@ func (s *inmemStore) Add(things ...Thingable) error {
 
 func (s *inmemStore) AddAll(things []Thingable) error {
 	s.rw.Lock()
-	defer s.rw.Unlock()
-
 	for _, thingable := range things {
 		thing := thingable.Thing()
 		s.things[thing.ID] = thing
+	}
+	s.rw.Unlock()
+
+	for _, thingable := range things {
+		thing := thingable.Thing()
+
+		// don't broadcast if we can't get types
+		// we don't want to enforce validation, but we can't broadcast
+		// if we don't know the types
+		if ! thing.Equal(TypeType, EntityType, RelationType) {
+			if types, err := s.typeHierarchy(thingable); err == nil {
+				s.broadcast.Send(context.TODO(), thingable, types...)
+			}
+		}
 	}
 
 	return nil
 }
 
-func (s *inmemStore) IsA(thingable Thingable, t *Type) (bool, error) {
+func (s *inmemStore) typeHierarchy(thingable Thingable) ([]ID, error) {
 	thing := thingable.Thing()
 
-	if t == TypeType {
-		return thing.Metadata.Type == t.Metadata.ID, nil
-	}
-
+	types := []ID{}
 	thingTypeID := thing.Metadata.Type
 
 	for {
-		if thingTypeID == t.Metadata.ID {
-			return true, nil
-		}
-
 		thingType, err := s.GetTypeByID(thingTypeID)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
+
+		types = append(types, thingTypeID)
 
 		if parent, ok := thingType.Properties["parent"]; !ok {
 			break
 		} else if parentString, ok := parent.(string); !ok {
-			return false, fmt.Errorf("%v should be a string", parent)
+			return nil, fmt.Errorf("%v should be a string", parent)
 		} else {
 			thingTypeID = ID(parentString)
+		}
+	}
+
+	return types, nil
+}
+
+func (s *inmemStore) IsA(thingable Thingable, t *Type) (bool, error) {
+	if t == TypeType {
+		return thingable.Thing().Metadata.Type == t.Metadata.ID, nil
+	}
+
+	types, err := s.typeHierarchy(thingable)
+	if err != nil {
+		return false, err
+	}
+
+	for _, typeID := range types {
+		if typeID == t.Metadata.ID {
+			return true, nil
 		}
 	}
 
@@ -85,9 +114,10 @@ func (s *inmemStore) Validate(t Thingable, opts ValidateOptions) ([]ValidationEr
 
 func (s *inmemStore) GetByID(id ID) (*Thing, error) {
 	s.rw.RLock()
-	defer s.rw.RUnlock()
+	thing, ok := s.things[id]
+	s.rw.RUnlock()
 
-	if thing, ok := s.things[id]; !ok {
+	if !ok {
 		return nil, ErrNotFound
 	} else {
 		return thing, nil
@@ -96,9 +126,10 @@ func (s *inmemStore) GetByID(id ID) (*Thing, error) {
 
 func (s *inmemStore) GetEntityByID(id ID) (*Entity, error) {
 	s.rw.RLock()
-	defer s.rw.RUnlock()
+	thing, ok := s.things[id]
+	s.rw.RUnlock()
 
-	if thing, ok := s.things[id]; !ok {
+	if !ok {
 		return nil, ErrNotFound
 	} else if ok, err := s.IsA(thing, EntityType); !ok {
 		return nil, ErrNotFound
@@ -111,9 +142,10 @@ func (s *inmemStore) GetEntityByID(id ID) (*Entity, error) {
 
 func (s *inmemStore) GetRelationByID(id ID) (*Relation, error) {
 	s.rw.RLock()
-	defer s.rw.RUnlock()
+	thing, ok := s.things[id]
+	s.rw.RUnlock()
 
-	if thing, ok := s.things[id]; !ok {
+	if !ok {
 		return nil, ErrNotFound
 	} else if ok, err := s.IsA(thing, RelationType); !ok {
 		return nil, ErrNotFound
@@ -126,9 +158,10 @@ func (s *inmemStore) GetRelationByID(id ID) (*Relation, error) {
 
 func (s *inmemStore) GetTypeByID(id ID) (*Type, error) {
 	s.rw.RLock()
-	defer s.rw.RUnlock()
+	thing, ok := s.things[id]
+	s.rw.RUnlock()
 
-	if thing, ok := s.things[id]; !ok {
+	if !ok {
 		return nil, ErrNotFound
 	} else if ok, err := s.IsA(thing, TypeType); !ok {
 		return nil, ErrNotFound
@@ -293,4 +326,8 @@ func (s *inmemStore) ListRelationsForEntity(entity *Entity, options ListOptions)
 	}
 
 	return relations, nil
+}
+
+func (s *inmemStore) WatchByType(ctx context.Context, typ *Type) (chan *Thing, error) {
+	return s.broadcast.Register(ctx, typ.Metadata.ID)
 }

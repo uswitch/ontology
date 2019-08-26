@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -37,8 +38,13 @@ func (t *Thing) Thing() *Thing { return t }
 func (t *Thing) String() string {
 	return fmt.Sprintf("%v[%v]%v", t.Metadata.ID, t.Metadata.Type, t.Properties)
 }
-func (t1 *Thing) Equal(t2 *Thing) bool {
-	return reflect.DeepEqual(t1, t2)
+func (t1 *Thing) Equal(ts ...Thingable) bool {
+	for _, t := range ts {
+		if ! reflect.DeepEqual(t1, t.Thing()) {
+			return false
+		}
+	}
+	return true
 }
 
 type Entity Thing
@@ -190,4 +196,6 @@ type Store interface {
 	ListTypes(ListOptions) ([]*Type, error)
 
 	ListRelationsForEntity(*Entity, ListOptions) ([]*Relation, error)
+
+	WatchByType(context.Context, *Type) (chan *Thing, error)
 }

@@ -100,11 +100,11 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 				return nil
 			}
 
-			if match, _ := s.IsA(thing, store.EntityType); match {
+			if match, _ := s.IsA(p.Context, thing, store.EntityType); match {
 				return entityType
-			} else if match, _ := s.IsA(thing, store.RelationType); match {
+			} else if match, _ := s.IsA(p.Context, thing, store.RelationType); match {
 				return relationType
-			} else if match, _ := s.IsA(thing, store.TypeType); match {
+			} else if match, _ := s.IsA(p.Context, thing, store.TypeType); match {
 				return typeType
 			} else {
 				log.Printf("unknown type: %v", thing)
@@ -198,7 +198,7 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 			var relations []*store.Relation
 			var err error
 
-			relations, err = s.ListRelationsForEntity(entity, listOptions)
+			relations, err = s.ListRelationsForEntity(p.Context, entity, listOptions)
 			if err != nil {
 				return nil, err
 			}
@@ -211,7 +211,7 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 					return nil, err
 				}
 
-				otherEntity, err := s.GetEntityByID(otherID)
+				otherEntity, err := s.GetEntityByID(p.Context, otherID)
 				if err != nil {
 					return nil, err
 				}
@@ -239,7 +239,7 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 					},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					return s.GetByID(store.ID(p.Args["id"].(string)))
+					return s.GetByID(p.Context, store.ID(p.Args["id"].(string)))
 				},
 			},
 			"things": &graphql.Field{
@@ -256,14 +256,14 @@ func NewSchema(s store.Store) (*graphql.Schema, error) {
 					typeID, ok := p.Args["type"].(string)
 
 					if !ok {
-						things, err = s.List(listOptions)
+						things, err = s.List(p.Context, listOptions)
 					} else {
-						typ, err := s.GetTypeByID(store.ID(typeID))
+						typ, err := s.GetTypeByID(p.Context, store.ID(typeID))
 						if err != nil {
 							return nil, err
 						}
 
-						things, err = s.ListByType(typ, listOptions)
+						things, err = s.ListByType(p.Context, typ, listOptions)
 					}
 
 					return (interface{})(things), err

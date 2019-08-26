@@ -16,6 +16,8 @@ var (
 
 type ID string
 
+func (id ID) String() string { return string(id) }
+
 type Metadata struct {
 	ID        ID
 	Type      ID

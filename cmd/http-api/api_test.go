@@ -73,12 +73,13 @@ func newAPIServer() (*httptest.Server, store.Store, error) {
 }
 
 func TestAPIPost(t *testing.T) {
+	ctx := context.Background()
 	srv, s, err := newAPIServer()
 	if err != nil {
 		t.Fatalf("Failed to create API server: %v", err)
 	}
 
-	numBeforePOST, err := s.Len()
+	numBeforePOST, err := s.Len(ctx)
 	if err != nil {
 		t.Fatalf("Couldn't count numnber of things before post: %v", err)
 	}
@@ -94,7 +95,7 @@ func TestAPIPost(t *testing.T) {
 		t.Errorf("POST expected %d, but got %d", expected, postResponse.StatusCode)
 	}
 
-	numAfterPOST, err := s.Len()
+	numAfterPOST, err := s.Len(ctx)
 	if err != nil {
 		t.Fatalf("Couldn't count numnber of things after post: %v", err)
 	}
@@ -105,6 +106,7 @@ func TestAPIPost(t *testing.T) {
 }
 
 func TestAPIPostRawJSON(t *testing.T) {
+	ctx := context.Background()
 	srv, s, err := newAPIServer()
 	if err != nil {
 		t.Fatalf("Failed to create API server: %v", err)
@@ -128,7 +130,7 @@ func TestAPIPostRawJSON(t *testing.T) {
 		t.Errorf("POST expected %d, but got %d", expected, postResponse.StatusCode)
 	}
 
-	if entity, err := s.GetEntityByID(store.ID("/wibble")); err != nil {
+	if entity, err := s.GetEntityByID(ctx, store.ID("/wibble")); err != nil {
 		t.Errorf("Failed to get /wibble: %v", err)
 	} else if entity.Metadata.Type != store.ID("/entity") {
 		t.Errorf("/wibble has the wrong type: %v", entity)

@@ -43,6 +43,7 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 		}
 
 		decoder := json.NewDecoder(r.Body)
+		ctx := r.Context()
 
 		for {
 			var thing store.Thing
@@ -55,7 +56,7 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 				return
 			}
 
-			if errors, err := s.Validate(&thing, validateOptions); err != nil {
+			if errors, err := s.Validate(ctx, &thing, validateOptions); err != nil {
 				log.Printf("coudln't validate thing: %v", err)
 				w.WriteHeader(500)
 				return
@@ -67,7 +68,7 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 		}
 
 		for _, thing := range thingsToAdd {
-			if err := s.Add(thing); err != nil {
+			if err := s.Add(ctx, thing); err != nil {
 				log.Printf("coudln't add thing: %v", err)
 				w.WriteHeader(500)
 				return

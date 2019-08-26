@@ -180,6 +180,7 @@ type Store interface {
 
 	Len() (int, error)
 
+	Types(Thingable) ([]*Type, error)
 	IsA(Thingable, *Type) (bool, error)
 	Validate(Thingable, ValidateOptions) ([]ValidationError, error)
 

@@ -54,8 +54,13 @@ func (s *inmemStore) AddAll(things []Thingable) error {
 		// we don't want to enforce validation, but we can't broadcast
 		// if we don't know the types
 		if ! thing.Equal(TypeType, EntityType, RelationType) {
-			if types, err := s.typeHierarchy(thingable); err == nil {
-				s.broadcast.Send(context.TODO(), thingable, types...)
+			if types, err := s.Types(thingable); err == nil {
+				typeIDs := make([]ID, len(types))
+				for idx, typ := range types {
+					typeIDs[idx] = typ.Metadata.ID
+				}
+
+				s.broadcast.Send(context.TODO(), thingable, typeIDs...)
 			}
 		}
 	}
@@ -63,10 +68,10 @@ func (s *inmemStore) AddAll(things []Thingable) error {
 	return nil
 }
 
-func (s *inmemStore) typeHierarchy(thingable Thingable) ([]ID, error) {
+func (s *inmemStore) Types(thingable Thingable) ([]*Type, error) {
 	thing := thingable.Thing()
 
-	types := []ID{}
+	types := []*Type{}
 	thingTypeID := thing.Metadata.Type
 
 	for {
@@ -75,7 +80,7 @@ func (s *inmemStore) typeHierarchy(thingable Thingable) ([]ID, error) {
 			return nil, err
 		}
 
-		types = append(types, thingTypeID)
+		types = append(types, thingType)
 
 		if parent, ok := thingType.Properties["parent"]; !ok {
 			break
@@ -94,13 +99,13 @@ func (s *inmemStore) IsA(thingable Thingable, t *Type) (bool, error) {
 		return thingable.Thing().Metadata.Type == t.Metadata.ID, nil
 	}
 
-	types, err := s.typeHierarchy(thingable)
+	types, err := s.Types(thingable)
 	if err != nil {
 		return false, err
 	}
 
-	for _, typeID := range types {
-		if typeID == t.Metadata.ID {
+	for _, typ := range types {
+		if typ.Metadata.ID == t.Metadata.ID {
 			return true, nil
 		}
 	}

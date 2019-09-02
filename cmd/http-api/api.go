@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -61,7 +62,7 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 				w.WriteHeader(500)
 				return
 			} else if len(errors) > 0 {
-				log.Printf("rejected: %v", thing.Metadata.ID)
+				log.Printf("rejected %v: %v", thing.Metadata.ID, errors)
 			} else {
 				thingsToAdd = append(thingsToAdd, &thing)
 			}
@@ -76,8 +77,10 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 		}
 	})
 
-	schema, err := graphql.NewSchema(s)
-	if err != nil {
+	provider := graphql.NewProvider(s)
+
+	// we don't want to stop syncing until we are shutdown
+	if err := provider.Sync(context.Background()); err != nil {
 		return nil, err
 	}
 
@@ -104,6 +107,15 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 
 		ctx := r.Context()
 
+		provider.SyncOnce(ctx)
+
+		schema, err := provider.Schema()
+		if err != nil {
+			log.Printf("Failed to generate graphql schema: %v", err)
+			w.WriteHeader(500)
+			return
+		}
+
 		auditLogger.Log(ctx, audit.AuditData{
 			"query":          opts.Query,
 			"variables":      opts.Variables,
@@ -111,11 +123,11 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 		})
 
 		result := graphqlgo.Do(graphqlgo.Params{
-			Schema:         *schema,
+			Schema:         schema,
 			RequestString:  opts.Query,
 			VariableValues: opts.Variables,
 			OperationName:  opts.OperationName,
-			Context:        ctx,
+			Context:        provider.AddValuesTo(ctx),
 		})
 
 		json.NewEncoder(w).Encode(result)

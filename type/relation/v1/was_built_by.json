@@ -17,10 +17,10 @@
                 "pointer_to": "/entity/v1/repository"
             },
             "ref": {
-                "type": ["string", "null"]
+                "type": "string"
             },
             "at": {
-                "type": ""
+                "type": "string"
             }
         }
     }

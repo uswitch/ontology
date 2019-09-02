@@ -120,6 +120,24 @@ func (s *inmemStore) TypeHierarchy(ctx context.Context, typ *Type) ([]*Type, err
 	return types, nil
 }
 
+func (s *inmemStore) Inherits(ctx context.Context, typ *Type, parent *Type) (bool, error) {
+	typeHierarchy, err := s.TypeHierarchy(ctx, typ)
+	if err != nil {
+		return false, err
+	}
+
+	isInheritted := false
+
+	for _, t := range typeHierarchy {
+		if t.Thing().Equal(parent) {
+			isInheritted = true
+			break
+		}
+	}
+
+	return isInheritted, nil
+}
+
 func (s *inmemStore) IsA(ctx context.Context, thingable Thingable, t *Type) (bool, error) {
 	if t == TypeType {
 		return thingable.Thing().Metadata.Type == t.Metadata.ID, nil
@@ -331,8 +349,21 @@ func (s *inmemStore) ListByType(ctx context.Context, typ *Type, options ListOpti
 	return s.constrainList(things, options)
 }
 
-func (s *inmemStore) ListRelationsForEntity(ctx context.Context, entity *Entity, options ListOptions) ([]*Relation, error) {
-	allRelations, err := s.listAllByType(ctx, RelationType)
+func (s *inmemStore) ListRelationsForEntity(ctx context.Context, relConstraint *Type, entity *Entity, options ListOptions) ([]*Relation, error) {
+
+	relType := RelationType
+
+	if relConstraint != nil {
+		if isRelation, err := s.Inherits(ctx, relConstraint, RelationType); err != nil {
+			return nil, err
+		} else if ! isRelation {
+			return nil, fmt.Errorf("%v is not a relation", relConstraint)
+		}
+
+		relType = relConstraint
+	}
+
+	allRelations, err := s.listAllByType(ctx, relType)
 	if err != nil {
 		return nil, err
 	}

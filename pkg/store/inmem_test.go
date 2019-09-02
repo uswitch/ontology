@@ -306,9 +306,9 @@ func compareLists(t *testing.T, ctx context.Context, listFunc1 func(context.Cont
 	}
 }
 
-func listRelationsForEntity(store Store, ent *Entity) func(context.Context,ListOptions) ([]*Thing, error) {
+func listRelationsForEntity(store Store, typ *Type, ent *Entity) func(context.Context,ListOptions) ([]*Thing, error) {
 	return convertRelationsToThings(func(ctx context.Context,opts ListOptions) ([]*Relation, error) {
-		return store.ListRelationsForEntity(ctx, ent, opts)
+		return store.ListRelationsForEntity(ctx, typ, ent, opts)
 	})
 }
 
@@ -330,11 +330,49 @@ func TestListRelationsForEntity(t *testing.T) {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
 
-	assertList(t, ctx, listRelationsForEntity(store, (*Entity)(ent1)), ListOptions{}, 2, []string{
+	assertList(t, ctx, listRelationsForEntity(store, nil, (*Entity)(ent1)), ListOptions{}, 2, []string{
 		"/rel/1",
 		"/rel/2",
 	})
 
+}
+
+func TestListRelationsForEntityWithType(t *testing.T) {
+	store := NewInMemoryStore()
+	ctx := context.Background()
+
+	ent1 := entity("/ent/1")
+	relType := typ("/bibble", RelationType.Metadata.ID.String(), nil)
+
+	if err := store.Add(
+		ctx,
+		ent1,
+		relType,
+		entity("/ent/2"),
+		entity("/ent/3"),
+		relationBetween("/rel/1", "/ent/1", "/ent/2"),
+		relationBetweenWithType("/rel/2", relType.Metadata.ID.String(), "/ent/3", "/ent/1"),
+		relationBetween("/rel/3", "/ent/2", "/ent/3"),
+	); err != nil {
+		t.Fatalf("Couldn't add to store: %v", err)
+	}
+
+	assertList(t, ctx, listRelationsForEntity(store, relType, (*Entity)(ent1)), ListOptions{}, 1, []string{
+		"/rel/2",
+	})
+
+}
+
+func TestListRelationsForEntityBadType(t *testing.T) {
+	store := NewInMemoryStore()
+	ctx := context.Background()
+
+	ent1 := entity("/ent/1")
+
+	_, err := store.ListRelationsForEntity(ctx, EntityType, (*Entity)(ent1), ListOptions{})
+	if err == nil {
+		t.Errorf("Should have raised an error as entity is not a relation type")
+	}
 }
 
 func TestList(t *testing.T) {

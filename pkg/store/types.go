@@ -184,6 +184,7 @@ type Store interface {
 
 	Types(context.Context, Thingable) ([]*Type, error)
 	TypeHierarchy(context.Context, *Type) ([]*Type, error)
+	Inherits(context.Context, *Type, *Type) (bool, error)
 	IsA(context.Context, Thingable, *Type) (bool, error)
 	Validate(context.Context, Thingable, ValidateOptions) ([]ValidationError, error)
 
@@ -199,7 +200,7 @@ type Store interface {
 	ListRelations(context.Context, ListOptions) ([]*Relation, error)
 	ListTypes(context.Context, ListOptions) ([]*Type, error)
 
-	ListRelationsForEntity(context.Context, *Entity, ListOptions) ([]*Relation, error)
+	ListRelationsForEntity(context.Context, *Type, *Entity, ListOptions) ([]*Relation, error)
 
 	WatchByType(context.Context, *Type) (chan *Thing, error)
 }

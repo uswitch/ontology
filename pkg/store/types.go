@@ -87,14 +87,14 @@ var (
 		},
 		Properties: Properties{
 			"spec": map[string]interface{}{
-				"parent": map[string]string{
+				"parent": map[string]interface{}{
 					"type": "string",
 					"pointer_to": "/type",
 				},
-				"template": map[string]string{
+				"template": map[string]interface{}{
 					"type": "string",
 				},
-				"spec": map[string]string{
+				"spec": map[string]interface{}{
 					"type": "object",
 				},
 				"required": map[string]interface{}{
@@ -121,11 +121,11 @@ var (
 		},
 		Properties: Properties{
 			"spec": map[string]interface{}{
-				"a": map[string]string{
+				"a": map[string]interface{}{
 					"type": "string",
 					"pointer_to": "/entity",
 				},
-				"b": map[string]string{
+				"b": map[string]interface{}{
 					"type": "string",
 					"pointer_to": "/entity",
 				},

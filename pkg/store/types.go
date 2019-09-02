@@ -183,6 +183,7 @@ type Store interface {
 	Len(context.Context) (int, error)
 
 	Types(context.Context, Thingable) ([]*Type, error)
+	TypeHierarchy(context.Context, *Type) ([]*Type, error)
 	IsA(context.Context, Thingable, *Type) (bool, error)
 	Validate(context.Context, Thingable, ValidateOptions) ([]ValidationError, error)
 

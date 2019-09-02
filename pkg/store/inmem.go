@@ -96,6 +96,30 @@ func (s *inmemStore) Types(ctx context.Context, thingable Thingable) ([]*Type, e
 	return types, nil
 }
 
+func (s *inmemStore) TypeHierarchy(ctx context.Context, typ *Type) ([]*Type, error) {
+	types := []*Type{}
+	thingTypeID := typ.Metadata.ID
+
+	for {
+		thingType, err := s.GetTypeByID(ctx, thingTypeID)
+		if err != nil {
+			return nil, err
+		}
+
+		types = append(types, thingType)
+
+		if parent, ok := thingType.Properties["parent"]; !ok {
+			break
+		} else if parentString, ok := parent.(string); !ok {
+			return nil, fmt.Errorf("%v should be a string", parent)
+		} else {
+			thingTypeID = ID(parentString)
+		}
+	}
+
+	return types, nil
+}
+
 func (s *inmemStore) IsA(ctx context.Context, thingable Thingable, t *Type) (bool, error) {
 	if t == TypeType {
 		return thingable.Thing().Metadata.Type == t.Metadata.ID, nil

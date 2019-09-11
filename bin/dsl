@@ -1,0 +1,97 @@
+#!/usr/bin/env ruby
+
+require 'digest'
+require 'json'
+
+class Thing
+
+  attr_reader :id, :type, :properties, :relations
+
+  def initialize(id, type, **properties)
+    @id = id
+    @type = type
+
+    @metadata = {
+      id: id,
+      type: type,
+    }
+    @properties = properties
+    @relations = []
+  end
+
+  def related_to(thing, type, **properties)
+    raise "can only related entities" if thing.type.start_with? "/rel" or @type.start_with? "/rel"
+    id = Digest::SHA1.hexdigest(@id + thing.id + type + properties.to_s)
+
+    relation = Thing.new(id, type, properties.merge(
+                           {
+                             a: self,
+                             b: thing,
+                           }
+                         ))
+
+    thing.relations << relation
+  end
+
+  def to_str
+    @id
+  end
+
+  def to_s
+    @id
+  end
+
+  def dump
+    this = [
+      {
+        metadata: @metadata,
+        properties: @properties,
+      },
+    ]
+
+    related = @relations.map { |relation|
+      other_ent = relation.properties[:b]
+
+      if other_ent.id == @id
+        other_ent = relation.properties[:a]
+      end
+
+      relation.dump + other_ent.dump
+    }.flatten
+
+    this + related
+  end
+
+  def dumpj(fd)
+    fd.write(dump.map { |obj| obj.to_json }.join("\n"))
+  end
+
+  def is_part_of(thing, **properties)
+    related_to(thing, "/relation/v1/is_part_of")
+  end
+
+  def is_classified_as(thing, **properties)
+    raise "#{thing.id} not a classification" if thing.type != "/entity/v1/classification"
+
+    related_to(thing, "/relation/v1/is_classified_as")
+  end
+
+end
+
+def id(base, name)
+  "#{base.id}/#{name}"
+end
+
+def classification(id, **properties)
+  Thing.new(id, "/entity/v1/classification", properties)
+end
+
+def service(id, **properties)
+  Thing.new(id, "/entity/v1/service", properties)
+end
+
+def team(id, **properties)
+  Thing.new(id, "/entity/v1/team", properties)
+end
+
+load(ARGV[0])

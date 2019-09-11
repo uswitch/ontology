@@ -50,11 +50,36 @@ func objectFromType(ctx context.Context, s store.Store, typ *store.Type) (*graph
 		"metadata": metadataField,
 	}
 
-	// if it's an entity type then we should attach the related field
+	interfaces := []*graphql.Interface{
+		thingInterface,
+	}
+
 	if isAnEntity, err := s.Inherits(ctx, typ, store.EntityType); err != nil {
 		return nil, err
 	} else if isAnEntity {
 		fields["related"] = relatedThingField
+		fields["relations"] = relationsField
+		fields["type"] = typeField
+
+		interfaces = append(interfaces, entityInterface)
+	}
+
+	if isARelation, err := s.Inherits(ctx, typ, store.RelationType); err != nil {
+		return nil, err
+	} else if isARelation {
+		fields["type"] = typeField
+		fields["a"] = aField
+		fields["b"] = bField
+
+		interfaces = append(interfaces, relationInterface)
+	}
+
+	if isAType, err := s.Inherits(ctx, typ, store.TypeType); err != nil {
+		return nil, err
+	} else if isAType {
+		fields["things"] = typedThingsField
+
+		interfaces = append(interfaces, typeInterface)
 	}
 
 	for currType := typ;; {
@@ -127,9 +152,7 @@ func objectFromType(ctx context.Context, s store.Store, typ *store.Type) (*graph
 	obj := graphql.NewObject(graphql.ObjectConfig{
 		Name: nameFromID(typ.Metadata.ID.String()),
 		Fields: fields,
-		Interfaces: []*graphql.Interface{
-			thingInterface,
-		},
+		Interfaces: interfaces,
 	})
 
 	return obj, nil

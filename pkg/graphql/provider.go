@@ -27,13 +27,15 @@ type provider struct {
 	rw    sync.RWMutex
 }
 
-func NewProvider(s store.Store) *provider {
-	return &provider{
+func NewProvider(s store.Store) (*provider, error) {
+	p := &provider{
 		s: s,
 		types: map[string]TypePair{
 			"/": TypePair{thingInterface, nil},
 		},
 	}
+
+	return p, nil
 }
 
 func (p *provider) AddValuesTo(ctx context.Context) context.Context {
@@ -50,44 +52,11 @@ func (p *provider) Sync(ctx context.Context) error {
 	return p.SyncOnce(ctx)
 }
 
-func pageAllTypes(ctx context.Context, fn func(context.Context, store.ListOptions)([]*store.Type, error)) ([]*store.Type, error) {
-	numResults := uint(10)
-	offset := uint(0)
-	currentOpts := store.ListOptions{
-		NumberOfResults: numResults,
-		Offset: offset,
-	}
-
-	allTypes := []*store.Type{}
-
-	for {
-		types, err := fn(ctx, currentOpts)
-		if err != nil {
-			return nil, err
-		}
-
-		allTypes = append(allTypes, types...)
-
-		if len(types) == int(numResults) {
-			currentOpts.Offset = currentOpts.Offset + numResults
-		} else {
-			break
-		}
-	}
-
-	return allTypes, nil
+func (p *provider) AddType(ctx context.Context, types ...*store.Type) error {
+	return p.AddTypes(ctx, types)
 }
 
-// only looks at the types at a point in time, rather than
-// setting up a streaming sync
-func (p *provider) SyncOnce(ctx context.Context) error {
-	types, err := pageAllTypes(ctx, p.s.ListTypes)
-	if err != nil {
-		return err
-	}
-
-	log.Println(types, err)
-
+func (p *provider) AddTypes(ctx context.Context, types []*store.Type) error {
 	typeMap := map[string]TypePair{}
 
 	for _, typ := range types {
@@ -108,6 +77,17 @@ func (p *provider) SyncOnce(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// only looks at the types at a point in time, rather than
+// setting up a streaming sync
+func (p *provider) SyncOnce(ctx context.Context) error {
+	types, err := pageAllTypes(ctx, p.s.ListTypes)
+	if err != nil {
+		return err
+	}
+
+	return p.AddTypes(ctx, types)
 }
 
 func (p *provider) TypeFor(id store.ID) (graphql.Type, bool) {
@@ -205,4 +185,35 @@ func (p *provider) Schema() (graphql.Schema, error) {
 		Query: rootQuery,
 		Types: types,
 	})
+}
+
+
+
+
+func pageAllTypes(ctx context.Context, fn func(context.Context, store.ListOptions)([]*store.Type, error)) ([]*store.Type, error) {
+	numResults := uint(10)
+	offset := uint(0)
+	currentOpts := store.ListOptions{
+		NumberOfResults: numResults,
+		Offset: offset,
+	}
+
+	allTypes := []*store.Type{}
+
+	for {
+		types, err := fn(ctx, currentOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		allTypes = append(allTypes, types...)
+
+		if len(types) == int(numResults) {
+			currentOpts.Offset = currentOpts.Offset + numResults
+		} else {
+			break
+		}
+	}
+
+	return allTypes, nil
 }

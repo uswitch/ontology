@@ -77,7 +77,10 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 		}
 	})
 
-	provider := graphql.NewProvider(s)
+	provider, err := graphql.NewProvider(s)
+	if err != nil {
+		return nil, err
+	}
 
 	// we don't want to stop syncing until we are shutdown
 	if err := provider.Sync(context.Background()); err != nil {

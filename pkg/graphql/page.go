@@ -53,8 +53,12 @@ var (
 )
 
 func NewPaginatedList(typ graphql.Type) graphql.Type {
+	return NewPaginatedListWithName(typ, fmt.Sprintf("%sPage", typ.Name()))
+}
+
+func NewPaginatedListWithName(typ graphql.Type, name string) graphql.Type {
 	return graphql.NewObject(graphql.ObjectConfig{
-		Name: fmt.Sprintf("%sPage", typ.Name()),
+		Name: name,
 		Fields: graphql.Fields{
 			"list": &graphql.Field{
 				Type: graphql.NewList(typ),

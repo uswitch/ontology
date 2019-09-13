@@ -16,11 +16,12 @@ import (
 	"github.com/uswitch/ontology/pkg/middleware"
 )
 
-func apiHandler(authn authnz.Authenticator, auditLogger audit.Logger) (http.Handler, error) {
+func apiHandler(authn authnz.Authenticator, auditLogger audit.Logger, cors middleware.Middleware) (http.Handler, error) {
 	apiMux := http.NewServeMux()
 
 	return middleware.Wrap(
 		[]middleware.Middleware{
+			cors,
 			authn,
 			auditLogger,
 		},
@@ -91,17 +92,18 @@ func main() {
 	}
 
 	auditLogger := audit.NewAuditLogger(log.New(os.Stderr, "audit\t", 0))
+	cors := middleware.NewCORSMiddleware(config.Api.CORS)
 
-	if api, err := apiHandler(oidcAuth, auditLogger); err != nil {
+	if api, err := apiHandler(oidcAuth, auditLogger, cors); err != nil {
 		log.Fatal(err)
 	} else {
-		apiServer = startServer("api", api, config.Api)
+		apiServer = startServer("api", api, config.Api.Server)
 	}
 
 	if ops, err := opsHandler(); err != nil {
 		log.Fatal(err)
 	} else {
-		opsServer = startServer("ops", ops, config.Ops)
+		opsServer = startServer("ops", ops, config.Ops.Server)
 	}
 
 	gracefulTimeout := time.Second * time.Duration(config.GracefulTimeoutSecs)

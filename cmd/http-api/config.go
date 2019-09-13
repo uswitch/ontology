@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/uswitch/ontology/pkg/authnz"
+	"github.com/uswitch/ontology/pkg/middleware"
 )
 
 type ServerConfig struct {
@@ -17,9 +18,18 @@ type ServerConfig struct {
 	IdleTimeoutSecs  uint
 }
 
+type ApiConfig struct {
+	Server ServerConfig
+	CORS   middleware.CORSConfig
+}
+
+type OpsConfig struct {
+	Server ServerConfig
+}
+
 type Config struct {
-	Api ServerConfig
-	Ops ServerConfig
+	Api ApiConfig
+	Ops OpsConfig
 
 	GracefulTimeoutSecs uint
 
@@ -28,19 +38,27 @@ type Config struct {
 
 var config = Config{
 	GracefulTimeoutSecs: 15,
-	Api: ServerConfig{
-		Addr: "127.0.0.1:8080",
+	Api: ApiConfig{
+		Server: ServerConfig{
+			Addr: "127.0.0.1:8080",
 
-		WriteTimeoutSecs: 15,
-		ReadTimeoutSecs:  15,
-		IdleTimeoutSecs:  60,
+			WriteTimeoutSecs: 15,
+			ReadTimeoutSecs:  15,
+			IdleTimeoutSecs:  60,
+		},
+		CORS: middleware.CORSConfig{
+			AllowedOrigins: []string{},
+			MaxAge:         86400, // 24 hours
+		},
 	},
-	Ops: ServerConfig{
-		Addr: "127.0.0.1:8081",
+	Ops: OpsConfig{
+		Server: ServerConfig{
+			Addr: "127.0.0.1:8081",
 
-		WriteTimeoutSecs: 15,
-		ReadTimeoutSecs:  15,
-		IdleTimeoutSecs:  60,
+			WriteTimeoutSecs: 15,
+			ReadTimeoutSecs:  15,
+			IdleTimeoutSecs:  60,
+		},
 	},
 }
 
@@ -60,6 +78,12 @@ func (c Config) validate() error {
 
 		if provider.UserClaim == "" {
 			provider.UserClaim = "sub"
+		}
+	}
+
+	for _, origin := range c.Api.CORS.AllowedOrigins {
+		if _, err := url.Parse(origin); err != nil {
+			return fmt.Errorf("%v has an invalid URL '%s': %v", c.Api.CORS.AllowedOrigins, origin, err)
 		}
 	}
 

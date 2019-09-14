@@ -44,7 +44,7 @@ type Thingable interface {
 func (t *Thing) Thing() *Thing { return t }
 func (t *Thing) ID() ID        { return t.Metadata.ID }
 func (t *Thing) String() string {
-	return fmt.Sprintf("%v[%v]%v", t.Metadata.ID, t.Metadata.Type, t.Properties)
+	return fmt.Sprintf("%v", t.Metadata.ID)
 }
 func (t1 *Thing) Equal(ts ...Thingable) bool {
 	for _, t := range ts {

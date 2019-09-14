@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"reflect"
@@ -102,34 +103,62 @@ var (
 		},
 	}
 
-	thingInterface = graphql.NewInterface(graphql.InterfaceConfig{
-		Name: "Thing",
-		Fields: graphql.Fields{
-			"metadata": metadataField,
+	propertiesField = &graphql.Field{
+		Type: graphql.String,
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			thingable, ok := p.Source.(store.Thingable)
+			if !ok {
+				return nil, fmt.Errorf("Not thingable")
+			}
+
+			thing := thingable.Thing()
+
+			bytes, err := json.Marshal(thing.Properties)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't jsonify thing properties: %v", err)
+			}
+
+			return string(bytes), nil
 		},
-		ResolveType: resolveThingType,
-	})
+	}
+
+	templateField = &graphql.Field{
+		Type: graphql.String,
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			thingable, ok := p.Source.(store.Thingable)
+			if !ok {
+				return nil, fmt.Errorf("Not thingable")
+			}
+
+			thing := thingable.Thing()
+
+			return thing.Properties["template"], nil
+		},
+	}
 )
 
 type relatedThing struct {
 	relation *store.Relation
-	entity    *store.Entity
+	entity   *store.Entity
 }
 
 var (
-	entityInterface, relationInterface, typeInterface *graphql.Interface
+	thingInterface, entityInterface, relationInterface, typeInterface *graphql.Interface
 
 	relatedThingType *graphql.Object
 
 	relatedThingField, relationsField, typeField, typedThingsField, aField, bField *graphql.Field
+
+	subTypesField, superTypeField *graphql.Field
 )
 
 func init() {
 	typeInterface = graphql.NewInterface(graphql.InterfaceConfig{
 		Name: "IType",
 		Fields: graphql.Fields{
-			"metadata": metadataField,
-			"things":   typedThingsField,
+			"metadata":   metadataField,
+			"properties": propertiesField,
+			"template":   templateField,
 		},
 		ResolveType: resolveThingType,
 	})
@@ -153,11 +182,77 @@ func init() {
 		},
 	}
 
+	thingInterface = graphql.NewInterface(graphql.InterfaceConfig{
+		Name: "Thing",
+		Fields: graphql.Fields{
+			"metadata":   metadataField,
+			"properties": propertiesField,
+			"type":       typeField,
+		},
+		ResolveType: resolveThingType,
+	})
+
+	superTypeField = &graphql.Field{
+		Type: typeInterface,
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			s, ok := p.Context.Value(StoreContextKey).(store.Store)
+			if !ok {
+				log.Println("Couldn't get a store instance from the context")
+			}
+
+			thing, ok := p.Source.(*store.Thing)
+			if !ok {
+				return nil, fmt.Errorf("Not an thing: %v", p.Source)
+			}
+
+			if parentID, ok := thing.Properties["parent"].(string); ok {
+				typ, err := s.GetTypeByID(p.Context, store.ID(parentID))
+				return (interface{})(typ.Thing()), err
+			} else {
+				return nil, nil
+			}
+		},
+	}
+
+	subTypesField = &graphql.Field{
+		Type: NewPaginatedList(typeInterface),
+		Args: PageArgs,
+		Resolve: ResolvePage(func(listOptions store.ListOptions, p graphql.ResolveParams) (interface{}, error) {
+			return (interface{})([]*store.Thing{}), nil
+		}),
+	}
+
+	typedThingsField = &graphql.Field{
+		Type: NewPaginatedListWithName(thingInterface, "TypedThingPage"),
+		Args: PageArgs,
+		Resolve: ResolvePage(func(listOptions store.ListOptions, p graphql.ResolveParams) (interface{}, error) {
+			s, ok := p.Context.Value(StoreContextKey).(store.Store)
+			if !ok {
+				log.Println("Couldn't get a store instance from the context")
+			}
+
+			thing, ok := p.Source.(*store.Thing)
+			if !ok {
+				return nil, fmt.Errorf("Not an thing: %v", p.Source)
+			}
+
+			typ := (*store.Type)(thing)
+
+			return s.ListByType(p.Context, typ, listOptions)
+		}),
+	}
+
+	typeInterface.AddFieldConfig("type", typeField)
+	typeInterface.AddFieldConfig("superType", superTypeField)
+	typeInterface.AddFieldConfig("subTypes", subTypesField)
+	typeInterface.AddFieldConfig("things", typedThingsField)
+
 	entityInterface = graphql.NewInterface(graphql.InterfaceConfig{
 		Name: "IEntity",
 		Fields: graphql.Fields{
-			"metadata":  metadataField,
-			"type":      typeField,
+			"metadata":   metadataField,
+			"properties": propertiesField,
+			"type":       typeField,
 		},
 
 		ResolveType: resolveThingType,
@@ -218,47 +313,27 @@ func init() {
 	relationInterface = graphql.NewInterface(graphql.InterfaceConfig{
 		Name: "IRelation",
 		Fields: graphql.Fields{
-			"metadata": metadataField,
-			"type":     typeField,
-			"a": aField,
-			"b": bField,
+			"metadata":   metadataField,
+			"properties": propertiesField,
+			"type":       typeField,
+			"a":          aField,
+			"b":          bField,
 		},
 		ResolveType: resolveThingType,
 	})
 
-	typedThingsField = &graphql.Field{
-		Type: NewPaginatedListWithName(thingInterface, "TypedThingPage"),
-		Args: PageArgs,
-		Resolve: ResolvePage(func(listOptions store.ListOptions, p graphql.ResolveParams) (interface{}, error) {
-			s, ok := p.Context.Value(StoreContextKey).(store.Store)
-			if !ok {
-				log.Println("Couldn't get a store instance from the context")
-			}
-
-			thing, ok := p.Source.(*store.Thing)
-			if !ok {
-				return nil, fmt.Errorf("Not an thing: %v", p.Source)
-			}
-
-			typ := (*store.Type)(thing)
-
-			return s.ListByType(p.Context, typ, listOptions)
-		}),
-	}
-
 	relatedThingType = graphql.NewObject(graphql.ObjectConfig{
 		Name: "RelatedThing",
 		Fields: graphql.Fields{
-			"metadata": &graphql.Field{
-				Type:        metadataType,
-				Description: "Metadata for this thing",
+			"relation": &graphql.Field{
+				Type: relationInterface,
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					relEnt, ok := p.Source.(*relatedThing)
 					if !ok {
 						return nil, fmt.Errorf("Not a relatedThing: %v", p.Source)
 					}
 
-					return relEnt.relation.Metadata, nil
+					return relEnt.relation.Thing(), nil
 				},
 			},
 			"entity": &graphql.Field{
@@ -326,12 +401,12 @@ func init() {
 				if err == store.ErrNotFound {
 					continue
 				} else if err != nil {
-					return nil, fmt.Errorf("Failed to get other id: %v", err)
+					return nil, fmt.Errorf("Failed to get other entity: %v", err)
 				}
 
 				relatedThings = append(relatedThings, &relatedThing{
 					relation: relation,
-					entity:    otherEntity,
+					entity:   otherEntity,
 				})
 			}
 

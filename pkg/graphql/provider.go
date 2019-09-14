@@ -62,7 +62,7 @@ func (p *provider) AddTypes(ctx context.Context, types []*store.Type) error {
 	for _, typ := range types {
 		graphqlType, err := objectFromType(ctx, p.s, typ)
 		if err != nil {
-			log.Printf("failed to generate type: %v", err)
+			log.Printf("failed to generate type %s: %v", typ, err)
 			return err
 		}
 

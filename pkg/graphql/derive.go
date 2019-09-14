@@ -48,6 +48,8 @@ func objectFromType(ctx context.Context, s store.Store, typ *store.Type) (*graph
 
 	fields := graphql.Fields{
 		"metadata": metadataField,
+		"type": typeField,
+		"properties": propertiesField,
 	}
 
 	interfaces := []*graphql.Interface{
@@ -59,7 +61,6 @@ func objectFromType(ctx context.Context, s store.Store, typ *store.Type) (*graph
 	} else if isAnEntity {
 		fields["related"] = relatedThingField
 		fields["relations"] = relationsField
-		fields["type"] = typeField
 
 		interfaces = append(interfaces, entityInterface)
 	}
@@ -67,7 +68,6 @@ func objectFromType(ctx context.Context, s store.Store, typ *store.Type) (*graph
 	if isARelation, err := s.Inherits(ctx, typ, store.RelationType); err != nil {
 		return nil, err
 	} else if isARelation {
-		fields["type"] = typeField
 		fields["a"] = aField
 		fields["b"] = bField
 
@@ -78,6 +78,8 @@ func objectFromType(ctx context.Context, s store.Store, typ *store.Type) (*graph
 		return nil, err
 	} else if isAType {
 		fields["things"] = typedThingsField
+		fields["superType"] = superTypeField
+		fields["subTypes"] = subTypesField
 
 		interfaces = append(interfaces, typeInterface)
 	}

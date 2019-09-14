@@ -3,6 +3,11 @@
 require 'digest'
 require 'json'
 
+def namify(str)
+  with_spaces = str.gsub(/_/, " ")
+  with_spaces.capitalize
+end
+
 class Thing
 
   attr_reader :id, :type, :properties, :relations
@@ -14,7 +19,11 @@ class Thing
     @metadata = {
       id: id,
       type: type,
+      name: properties[:name] || namify(id.split('/')[-1])
     }
+
+    properties.delete(:name)
+
     @properties = properties
     @relations = []
   end

@@ -1,5 +1,6 @@
 metadata:
   type: /type
+  name: Is classified as
 properties:
   parent: /relation/v1
   template: "{{{ a }}} is classified as {{{ b }}}"

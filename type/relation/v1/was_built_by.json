@@ -1,6 +1,7 @@
 {
     "metadata": {
-        "type": "/type"
+        "type": "/type",
+        "name": "Was built by"
     },
     "properties": {
         "parent": "/relation/v1",

@@ -1,5 +1,6 @@
 metadata:
   type: /type
+  name: Is the same as
 properties:
   parent: /relation/v1
   template: "{{{ a }}} is the same as {{{ b }}}"

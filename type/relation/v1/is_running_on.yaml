@@ -1,5 +1,6 @@
 metadata:
   type: /type
+  name: Is running on
 properties:
   parent: /relation/v1
   template: "{{{ a }}} is running on {{{ b }}}"

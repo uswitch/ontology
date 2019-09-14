@@ -84,6 +84,7 @@ var (
 		Metadata: Metadata{
 			ID:   ID("/type"),
 			Type: ID("/type"),
+			Name: "Type",
 		},
 		Properties: Properties{
 			"spec": map[string]interface{}{
@@ -111,6 +112,7 @@ var (
 		Metadata: Metadata{
 			ID:   ID("/entity"),
 			Type: ID("/type"),
+			Name: "Entity",
 		},
 	}
 
@@ -118,6 +120,7 @@ var (
 		Metadata: Metadata{
 			ID:   ID("/relation"),
 			Type: ID("/type"),
+			Name: "Relation",
 		},
 		Properties: Properties{
 			"spec": map[string]interface{}{

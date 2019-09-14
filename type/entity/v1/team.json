@@ -1,6 +1,7 @@
 {
     "metadata": {
-        "type": "/type"
+        "type": "/type",
+        "name": "Team"
     },
     "properties": {
         "parent": "/entity/v1",

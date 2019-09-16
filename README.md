@@ -45,10 +45,13 @@ an array using stringified JSON.
 
 ### Kubernetes labeling example
 
+Kubernetes is a devil and doesn't allow paths after the subdomain, so we have to use `.` instead of `/`
+as a separator.
+
 ```
 metadata:
   annotations:
-    cloud.rvu.ontology/relation/v1/is_part_of: '["/rvu/mortgages/page-speed", "/rvu/mortgages/bankrate/front-end"]'
+    cloud.rvu.ontology/relation.v1.is_part_of: '["/rvu/mortgages/page-speed", "/rvu/mortgages/bankrate/front-end"]'
 ```
 
 ### Github labeling example

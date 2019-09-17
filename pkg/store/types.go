@@ -16,7 +16,12 @@ var (
 
 type ID string
 
+type IDable interface {
+	ID() ID
+}
+
 func (id ID) String() string { return string(id) }
+func (id ID) ID() ID { return id }
 
 type Metadata struct {
 	ID        ID
@@ -37,6 +42,7 @@ type Thingable interface {
 }
 
 func (t *Thing) Thing() *Thing { return t }
+func (t *Thing) ID() ID { return t.Metadata.ID }
 func (t *Thing) String() string {
 	return fmt.Sprintf("%v[%v]%v", t.Metadata.ID, t.Metadata.Type, t.Properties)
 }
@@ -51,10 +57,12 @@ func (t1 *Thing) Equal(ts ...Thingable) bool {
 
 type Entity Thing
 
+func (t *Entity) ID() ID { return t.Metadata.ID }
 func (t *Entity) Thing() *Thing { return (*Thing)(t) }
 
 type Relation Thing
 
+func (t *Relation) ID() ID { return t.Metadata.ID }
 func (t *Relation) Thing() *Thing { return (*Thing)(t) }
 func (r *Relation) Involves(entity *Entity) bool {
 	a, aOk := r.Properties["a"].(string)
@@ -77,6 +85,7 @@ func (r *Relation) OtherID(entity *Entity) (ID, error) {
 
 type Type Thing
 
+func (t *Type) ID() ID { return t.Metadata.ID }
 func (t *Type) Thing() *Thing { return (*Thing)(t) }
 
 var (
@@ -191,10 +200,10 @@ type Store interface {
 	IsA(context.Context, Thingable, *Type) (bool, error)
 	Validate(context.Context, Thingable, ValidateOptions) ([]ValidationError, error)
 
-	GetByID(context.Context, ID) (*Thing, error)
-	GetEntityByID(context.Context, ID) (*Entity, error)
-	GetRelationByID(context.Context, ID) (*Relation, error)
-	GetTypeByID(context.Context, ID) (*Type, error)
+	GetByID(context.Context, IDable) (*Thing, error)
+	GetEntityByID(context.Context, IDable) (*Entity, error)
+	GetRelationByID(context.Context, IDable) (*Relation, error)
+	GetTypeByID(context.Context, IDable) (*Type, error)
 
 	List(context.Context, ListOptions) ([]*Thing, error)
 	ListByType(context.Context, *Type, ListOptions) ([]*Thing, error)

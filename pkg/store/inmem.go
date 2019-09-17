@@ -45,7 +45,7 @@ func (s *inmemStore) AddAll(ctx context.Context, things []Thingable) error {
 	s.rw.Lock()
 	for _, thingable := range things {
 		thing := thingable.Thing()
-		s.things[thing.ID] = thing
+		s.things[thing.ID()] = thing
 	}
 	s.rw.Unlock()
 
@@ -161,7 +161,9 @@ func (s *inmemStore) Validate(ctx context.Context, t Thingable, opts ValidateOpt
 	return validate(ctx, s, t, opts)
 }
 
-func (s *inmemStore) GetByID(ctx context.Context, id ID) (*Thing, error) {
+func (s *inmemStore) GetByID(ctx context.Context, idable IDable) (*Thing, error) {
+	id := idable.ID()
+
 	s.rw.RLock()
 	thing, ok := s.things[id]
 	s.rw.RUnlock()
@@ -173,7 +175,9 @@ func (s *inmemStore) GetByID(ctx context.Context, id ID) (*Thing, error) {
 	}
 }
 
-func (s *inmemStore) GetEntityByID(ctx context.Context, id ID) (*Entity, error) {
+func (s *inmemStore) GetEntityByID(ctx context.Context, idable IDable) (*Entity, error) {
+	id := idable.ID()
+
 	s.rw.RLock()
 	thing, ok := s.things[id]
 	s.rw.RUnlock()
@@ -189,7 +193,9 @@ func (s *inmemStore) GetEntityByID(ctx context.Context, id ID) (*Entity, error) 
 	}
 }
 
-func (s *inmemStore) GetRelationByID(ctx context.Context, id ID) (*Relation, error) {
+func (s *inmemStore) GetRelationByID(ctx context.Context, idable IDable) (*Relation, error) {
+	id := idable.ID()
+
 	s.rw.RLock()
 	thing, ok := s.things[id]
 	s.rw.RUnlock()
@@ -205,7 +211,9 @@ func (s *inmemStore) GetRelationByID(ctx context.Context, id ID) (*Relation, err
 	}
 }
 
-func (s *inmemStore) GetTypeByID(ctx context.Context, id ID) (*Type, error) {
+func (s *inmemStore) GetTypeByID(ctx context.Context, idable IDable) (*Type, error) {
+	id := idable.ID()
+
 	s.rw.RLock()
 	thing, ok := s.things[id]
 	s.rw.RUnlock()

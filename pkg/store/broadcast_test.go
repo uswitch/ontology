@@ -6,9 +6,25 @@ import (
 	"testing"
 )
 
+func thingWithType(thingID string, typeID string, properties Properties) *Thing {
+	thing := &Thing{
+		Metadata: Metadata{
+			ID:   ID(thingID),
+			Type: ID(typeID),
+		},
+	}
+
+	if properties != nil {
+		thing.Properties = properties
+	}
+
+	return thing
+}
+func entity(ID string) *Thing { return thingWithType(ID, "/entity", nil) }
+
 func appendFromChannel(ch chan *Thing, list *[]*Thing, wg *sync.WaitGroup) {
-	for ;; {
-		if thing := <- ch; thing == nil {
+	for {
+		if thing := <-ch; thing == nil {
 			wg.Done()
 			return
 		} else {
@@ -18,7 +34,7 @@ func appendFromChannel(ch chan *Thing, list *[]*Thing, wg *sync.WaitGroup) {
 }
 
 func TestBroadcastSendRecieve(t *testing.T) {
-	b := newBroadcast()
+	b := NewBroadcast()
 
 	closedWG := sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(context.Background())

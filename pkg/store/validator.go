@@ -10,6 +10,7 @@ import (
 )
 
 const resolutionPath = "/requires_resolution"
+
 type resolutionPair struct {
 	ID
 	Type ID
@@ -52,7 +53,7 @@ func init() {
 	jsonschema.RegisterValidator("pointer_to", NewPointerTo)
 }
 
-func typeProperties(ctx context.Context, s Store, typ *Type) (jsonschema.Properties, jsonschema.Required, error) {
+func TypeProperties(ctx context.Context, s Store, typ *Type) (jsonschema.Properties, jsonschema.Required, error) {
 	props := jsonschema.Properties{}
 	requiredSet := map[string]struct{}{}
 
@@ -106,7 +107,7 @@ func typeProperties(ctx context.Context, s Store, typ *Type) (jsonschema.Propert
 	return props, jsonschema.Required(required), nil
 }
 
-func validate(ctx context.Context, s Store, thingable Thingable, options ValidateOptions) ([]ValidationError, error) {
+func Validate(ctx context.Context, s Store, thingable Thingable, options ValidateOptions) ([]ValidationError, error) {
 	thing := thingable.Thing()
 
 	typ, err := s.GetTypeByID(ctx, thing.Metadata.Type)
@@ -114,7 +115,7 @@ func validate(ctx context.Context, s Store, thingable Thingable, options Validat
 		return nil, err
 	}
 
-	propsSchema, requiredProps, err := typeProperties(ctx, s, typ)
+	propsSchema, requiredProps, err := TypeProperties(ctx, s, typ)
 	if err != nil {
 		return nil, err
 	}

@@ -6,19 +6,19 @@ import (
 	"sync"
 )
 
-type broadcast struct {
+type Broadcast struct {
 	registered map[ID][]chan *Thing
 
 	rw sync.RWMutex
 }
 
-func newBroadcast() *broadcast {
-	return &broadcast{
+func NewBroadcast() *Broadcast {
+	return &Broadcast{
 		registered: map[ID][]chan *Thing{},
 	}
 }
 
-func (b *broadcast) Register(ctx context.Context, id ID) (chan *Thing, error) {
+func (b *Broadcast) Register(ctx context.Context, id ID) (chan *Thing, error) {
 	b.rw.Lock()
 	defer b.rw.Unlock()
 
@@ -48,7 +48,7 @@ func (b *broadcast) Register(ctx context.Context, id ID) (chan *Thing, error) {
 	return ch, nil
 }
 
-func (b *broadcast) Send(ctx context.Context, thingable Thingable, ids ...ID) error {
+func (b *Broadcast) Send(ctx context.Context, thingable Thingable, ids ...ID) error {
 	b.rw.RLock()
 	defer b.rw.RUnlock()
 

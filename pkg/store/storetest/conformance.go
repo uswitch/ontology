@@ -22,6 +22,7 @@ func Conformance(t *testing.T, newStore func() store.Store) {
 		"ListRelationsForEntityWithType": TestListRelationsForEntityWithType,
 		"ListRelationsForEntityBadType":  TestListRelationsForEntityBadType,
 
+		"WatchByID":   TestWatchByID,
 		"WatchByType": TestWatchByType,
 
 		"TypeProperties": TestTypeProperties,
@@ -723,6 +724,66 @@ func TestWatchByType(t *testing.T, s store.Store) {
 	}
 	if expected := 1; len(entitiesList1) != expected {
 		t.Errorf("Expected there to be %d types, but it was %d", expected, len(entitiesList1))
+	}
+
+}
+
+func TestWatchByID(t *testing.T, s store.Store) {
+	closedWG := sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
+
+	closedWG.Add(2)
+
+	wibbleChanges := []*store.Thing{}
+	if ch, err := s.WatchByID(ctx, store.ID("/wibble")); err != nil {
+		t.Fatalf("Couldn't watch type: %v", err)
+	} else {
+		go appendFromChannel(ch, &wibbleChanges, &closedWG)
+	}
+
+	nibbleChanges := []*store.Thing{}
+	if ch, err := s.WatchByID(ctx, store.ID("/nibble")); err != nil {
+		t.Fatalf("Couldn't watch type: %v", err)
+	} else {
+		go appendFromChannel(ch, &nibbleChanges, &closedWG)
+	}
+
+	// do some changes
+	if err := s.Add(
+		ctx,
+		ntype("/wibble"),
+		ntype("/bibble"),
+	); err != nil {
+		t.Fatalf("Couldn't add the bits: %v", err)
+	}
+
+	// cancel the context
+	cancel()
+	closedWG.Wait()
+
+	// check the expected numbers
+	if expected := 1; len(wibbleChanges) != expected {
+		t.Errorf("Expected there to be %d /wibble changes, but it was %d", expected, len(wibbleChanges))
+	}
+	if expected := 0; len(nibbleChanges) != expected {
+		t.Errorf("Expected there to be %d /nibble changes, but it was %d", expected, len(nibbleChanges))
+	}
+
+	// do some changes
+	if err := s.Add(
+		ctx,
+		ntype("/wibble"),
+		ntype("/bibble"),
+	); err != nil {
+		t.Fatalf("Couldn't add the bits: %v", err)
+	}
+
+	// check the numbers haven't changed
+	if expected := 1; len(wibbleChanges) != expected {
+		t.Errorf("Expected there to be %d /wibble changes, but it was %d", expected, len(wibbleChanges))
+	}
+	if expected := 0; len(nibbleChanges) != expected {
+		t.Errorf("Expected there to be %d /nibble changes, but it was %d", expected, len(nibbleChanges))
 	}
 
 }

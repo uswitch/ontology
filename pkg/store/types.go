@@ -21,7 +21,7 @@ type IDable interface {
 }
 
 func (id ID) String() string { return string(id) }
-func (id ID) ID() ID { return id }
+func (id ID) ID() ID         { return id }
 
 type Metadata struct {
 	ID        ID
@@ -42,13 +42,13 @@ type Thingable interface {
 }
 
 func (t *Thing) Thing() *Thing { return t }
-func (t *Thing) ID() ID { return t.Metadata.ID }
+func (t *Thing) ID() ID        { return t.Metadata.ID }
 func (t *Thing) String() string {
 	return fmt.Sprintf("%v[%v]%v", t.Metadata.ID, t.Metadata.Type, t.Properties)
 }
 func (t1 *Thing) Equal(ts ...Thingable) bool {
 	for _, t := range ts {
-		if ! reflect.DeepEqual(t1, t.Thing()) {
+		if !reflect.DeepEqual(t1, t.Thing()) {
 			return false
 		}
 	}
@@ -57,12 +57,12 @@ func (t1 *Thing) Equal(ts ...Thingable) bool {
 
 type Entity Thing
 
-func (t *Entity) ID() ID { return t.Metadata.ID }
+func (t *Entity) ID() ID        { return t.Metadata.ID }
 func (t *Entity) Thing() *Thing { return (*Thing)(t) }
 
 type Relation Thing
 
-func (t *Relation) ID() ID { return t.Metadata.ID }
+func (t *Relation) ID() ID        { return t.Metadata.ID }
 func (t *Relation) Thing() *Thing { return (*Thing)(t) }
 func (r *Relation) Involves(entity *Entity) bool {
 	a, aOk := r.Properties["a"].(string)
@@ -85,7 +85,7 @@ func (r *Relation) OtherID(entity *Entity) (ID, error) {
 
 type Type Thing
 
-func (t *Type) ID() ID { return t.Metadata.ID }
+func (t *Type) ID() ID        { return t.Metadata.ID }
 func (t *Type) Thing() *Thing { return (*Thing)(t) }
 
 var (
@@ -98,7 +98,7 @@ var (
 		Properties: Properties{
 			"spec": map[string]interface{}{
 				"parent": map[string]interface{}{
-					"type": "string",
+					"type":       "string",
 					"pointer_to": "/type",
 				},
 				"template": map[string]interface{}{
@@ -134,11 +134,11 @@ var (
 		Properties: Properties{
 			"spec": map[string]interface{}{
 				"a": map[string]interface{}{
-					"type": "string",
+					"type":       "string",
 					"pointer_to": "/entity",
 				},
 				"b": map[string]interface{}{
-					"type": "string",
+					"type":       "string",
 					"pointer_to": "/entity",
 				},
 			},
@@ -170,8 +170,8 @@ type ListOptions struct {
 	NumberOfResults uint
 }
 
-
 type PointerOptions int
+
 const (
 	ResolvePointers = PointerOptions(iota)
 	IgnoreMissingPointers
@@ -214,5 +214,6 @@ type Store interface {
 
 	ListRelationsForEntity(context.Context, *Type, *Entity, ListOptions) ([]*Relation, error)
 
-	WatchByType(context.Context, *Type) (chan *Thing, error)
+	WatchByID(context.Context, IDable) (chan *Thing, error)
+	WatchByType(context.Context, IDable) (chan *Thing, error)
 }

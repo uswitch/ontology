@@ -11,16 +11,18 @@ import (
 )
 
 type inmemStore struct {
-	things    map[store.ID]*store.Thing
-	broadcast *store.Broadcast
+	things        map[store.ID]*store.Thing
+	typeBroadcast *store.Broadcast
+	idBroadcast   *store.Broadcast
 
 	rw sync.RWMutex
 }
 
 func NewInMemoryStore() store.Store {
 	s := &inmemStore{
-		things:    map[store.ID]*store.Thing{},
-		broadcast: store.NewBroadcast(),
+		things:        map[store.ID]*store.Thing{},
+		typeBroadcast: store.NewBroadcast(),
+		idBroadcast:   store.NewBroadcast(),
 	}
 
 	ctx := context.TODO()
@@ -54,6 +56,8 @@ func (s *inmemStore) AddAll(ctx context.Context, things []store.Thingable) error
 	for _, thingable := range things {
 		thing := thingable.Thing()
 
+		s.idBroadcast.Send(ctx, thingable, thing.ID())
+
 		// don't broadcast if we can't get types
 		// we don't want to enforce validation, but we can't broadcast
 		// if we don't know the types
@@ -64,7 +68,7 @@ func (s *inmemStore) AddAll(ctx context.Context, things []store.Thingable) error
 					typeIDs[idx] = typ.Metadata.ID
 				}
 
-				s.broadcast.Send(ctx, thingable, typeIDs...)
+				s.typeBroadcast.Send(ctx, thingable, typeIDs...)
 			}
 		}
 	}
@@ -400,6 +404,10 @@ func (s *inmemStore) ListRelationsForEntity(ctx context.Context, relConstraint *
 	return relations, nil
 }
 
-func (s *inmemStore) WatchByType(ctx context.Context, typ *store.Type) (chan *store.Thing, error) {
-	return s.broadcast.Register(ctx, typ.Metadata.ID)
+func (s *inmemStore) WatchByType(ctx context.Context, idable store.IDable) (chan *store.Thing, error) {
+	return s.typeBroadcast.Register(ctx, idable.ID())
+}
+
+func (s *inmemStore) WatchByID(ctx context.Context, idable store.IDable) (chan *store.Thing, error) {
+	return s.idBroadcast.Register(ctx, idable.ID())
 }

@@ -1,7 +1,7 @@
 
 .PHONY: all test
 
-all: bin/http-api
+all: bin/http-api bin/query
 
 test:
 	go test github.com/uswitch/ontology/pkg/audit
@@ -14,3 +14,6 @@ test:
 
 bin/http-api: $(shell find cmd/http-api -iname '*.go') $(shell find pkg/ -iname '*.go')
 	go build -o bin/http-api ./cmd/http-api
+
+bin/query: $(shell find cmd/query -iname '*.go') $(shell find pkg/ -iname '*.go')
+	go build -o bin/query ./cmd/query

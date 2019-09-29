@@ -1,4 +1,5 @@
 /external/
 /tmp/
 /bin/http-api
+/bin/query
 /config.json

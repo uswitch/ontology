@@ -5,6 +5,7 @@ go 1.12
 require (
 	github.com/coreos/go-oidc v2.0.0+incompatible
 	github.com/google/uuid v1.1.1
+	github.com/gorilla/websocket v1.4.1
 	github.com/graphql-go/graphql v0.7.8
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
 	github.com/qri-io/jsonschema v0.1.1

@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gorilla/websocket"
+
 	"github.com/uswitch/ontology/pkg/audit"
 	"github.com/uswitch/ontology/pkg/authnz"
 	"github.com/uswitch/ontology/pkg/middleware"
@@ -84,7 +86,24 @@ func main() {
 
 	store := inmem.NewInMemoryStore()
 
-	if api, err := apiHandler(store, oidcAuth, auditLogger, cors); err != nil {
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  config.Api.WS.ReadBufferSize,
+		WriteBufferSize: config.Api.WS.WriteBufferSize,
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+
+			for _, allowedOrigin := range config.Api.WS.AllowedOrigins {
+				if allowedOrigin == origin {
+					return true
+				}
+			}
+
+			return false
+		},
+		Subprotocols: []string{"graphql-ws"},
+	}
+
+	if api, err := apiHandler(store, upgrader, oidcAuth, auditLogger, cors); err != nil {
 		log.Fatal(err)
 	} else {
 		apiServer = startServer("api", api, config.Api.Server)

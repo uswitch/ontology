@@ -18,9 +18,17 @@ type ServerConfig struct {
 	IdleTimeoutSecs  uint
 }
 
+type WSConfig struct {
+	ReadBufferSize  int
+	WriteBufferSize int
+
+	AllowedOrigins []string
+}
+
 type ApiConfig struct {
 	Server ServerConfig
 	CORS   middleware.CORSConfig
+	WS     WSConfig
 }
 
 type OpsConfig struct {
@@ -49,6 +57,11 @@ var config = Config{
 		CORS: middleware.CORSConfig{
 			AllowedOrigins: []string{},
 			MaxAge:         86400, // 24 hours
+		},
+		WS: WSConfig{
+			AllowedOrigins:  []string{},
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
 		},
 	},
 	Ops: OpsConfig{

@@ -8,11 +8,13 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	graphqlgo "github.com/graphql-go/graphql"
 
 	"github.com/uswitch/ontology/pkg/audit"
 	"github.com/uswitch/ontology/pkg/authnz"
 	"github.com/uswitch/ontology/pkg/graphql"
+	graphqlws "github.com/uswitch/ontology/pkg/graphql/ws"
 	"github.com/uswitch/ontology/pkg/middleware"
 	"github.com/uswitch/ontology/pkg/store"
 )
@@ -23,7 +25,7 @@ type RequestOptions struct {
 	OperationName string                 `json:"operationName" url:"operationName" schema:"operationName"`
 }
 
-func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Logger, cors middleware.Middleware) (http.Handler, error) {
+func apiHandler(s store.Store, upgrader websocket.Upgrader, authn authnz.Authenticator, auditLogger audit.Logger, cors middleware.Middleware) (http.Handler, error) {
 	apiMux := http.NewServeMux()
 
 	apiMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +88,22 @@ func apiHandler(s store.Store, authn authnz.Authenticator, auditLogger audit.Log
 	if err := provider.Sync(context.Background()); err != nil {
 		return nil, err
 	}
+
+	apiMux.HandleFunc("/graphqlws", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("failed to do websocket upgrade: %v", err)
+			return
+		}
+
+		server := graphqlws.NewServerChannel(
+			r.Context(), conn,
+			graphql.WSHandler(provider, auditLogger),
+		)
+
+		server.Accept(r.Context())
+		server.Listen(r.Context())
+	})
 
 	apiMux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, err := ioutil.ReadAll(r.Body)

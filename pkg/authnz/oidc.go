@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"gopkg.in/square/go-jose.v2"
 	"github.com/coreos/go-oidc"
+	"gopkg.in/square/go-jose.v2"
 )
 
 type OIDCConfig struct {

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gorilla/websocket"
+
 	"github.com/uswitch/ontology/pkg/audit"
 	"github.com/uswitch/ontology/pkg/authnz"
 	"github.com/uswitch/ontology/pkg/authnz/authnztest"
@@ -64,7 +66,7 @@ func newAPIServer() (*httptest.Server, store.Store, error) {
 
 	auditLogger := audit.NewAuditLogger(log.New(os.Stderr, "audit\t", 0))
 
-	api, err := apiHandler(s, oidcAuth, auditLogger, middleware.PassThru)
+	api, err := apiHandler(s, websocket.Upgrader{}, oidcAuth, auditLogger, middleware.PassThru)
 	if err != nil {
 		return nil, nil, err
 	}

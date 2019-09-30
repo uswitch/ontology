@@ -130,7 +130,7 @@ func apiHandler(s store.Store, upgrader websocket.Upgrader, authn authnz.Authent
 
 		provider.SyncOnce(ctx)
 
-		schema, err := provider.Schema()
+		schema, _, err := provider.Schema()
 		if err != nil {
 			log.Printf("Failed to generate graphql schema: %v", err)
 			w.WriteHeader(500)

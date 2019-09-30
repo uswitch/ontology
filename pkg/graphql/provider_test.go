@@ -13,7 +13,7 @@ func TestProviderSyncOnce(t *testing.T) {
 		t.Fatalf("Couldn't create provider: %v", err)
 	}
 
-	schema, err := p.Schema()
+	schema, _, err := p.Schema()
 	if err != nil {
 		t.Fatalf("Couldn't generate schema: %v", err)
 	}

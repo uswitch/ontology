@@ -18,7 +18,7 @@ const (
 
 type TypePair struct {
 	GraphQL graphql.Type
-	Store *store.Type
+	Store   *store.Type
 }
 
 type provider struct {
@@ -128,12 +128,20 @@ func (p *provider) TypePairs() []TypePair {
 	return pairs
 }
 
+type StreamField struct {
+	Stream func(graphql.ResolveParams) (<-chan interface{}, error)
+}
+
+type StreamFields map[string]*StreamField
+
 // generate a schema for the currently known types, this
 // will change over time as the types in the store change
-func (p *provider) Schema() (graphql.Schema, error) {
+func (p *provider) Schema() (graphql.Schema, StreamFields, error) {
 	types := p.Types()
 	pairs := p.TypePairs()
-	fields := graphql.Fields{}
+	queryFields := graphql.Fields{}
+	subscriptionFields := graphql.Fields{}
+	subscriptionStreams := StreamFields{}
 
 	for _, pair := range pairs {
 		typ := pair.GraphQL
@@ -144,7 +152,7 @@ func (p *provider) Schema() (graphql.Schema, error) {
 		single := fieldCase(name)
 		plural := plural(single)
 
-		fields[single] = &graphql.Field{
+		queryFields[single] = &graphql.Field{
 			Type: typ,
 			Args: graphql.FieldConfigArgument{
 				"id": &graphql.ArgumentConfig{
@@ -161,7 +169,7 @@ func (p *provider) Schema() (graphql.Schema, error) {
 			},
 		}
 
-		fields[plural] = &graphql.Field{
+		queryFields[plural] = &graphql.Field{
 			Type: NewPaginatedList(typ),
 			Args: PageArgs,
 			Resolve: ResolvePage(func(listOptions store.ListOptions, p graphql.ResolveParams) (interface{}, error) {
@@ -175,28 +183,97 @@ func (p *provider) Schema() (graphql.Schema, error) {
 				return (interface{})(things), err
 			}),
 		}
+
+		singleChange := fmt.Sprintf("%sChanges", single)
+
+		subscriptionFields[singleChange] = &graphql.Field{
+			Type: typ,
+			Args: graphql.FieldConfigArgument{
+				"id": &graphql.ArgumentConfig{
+					Type: graphql.ID,
+				},
+			},
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				rootFields, ok := p.Source.(map[string]interface{})
+				if !ok {
+					return nil, fmt.Errorf("Missing root fields")
+				}
+
+				value, ok := rootFields[singleChange]
+				if !ok {
+					return nil, fmt.Errorf("Missing root value")
+				}
+
+				return value, nil
+			},
+		}
+
+		subscriptionStreams[singleChange] = &StreamField{
+			Stream: func(p graphql.ResolveParams) (<-chan interface{}, error) {
+				s, ok := p.Context.Value(StoreContextKey).(store.Store)
+				if !ok {
+					log.Println("Couldn't get a store instance from the context")
+				}
+
+				if id, ok := p.Args["id"].(string); ok {
+					ch, err := s.WatchByID(p.Context, store.ID(id))
+					if err != nil {
+						return nil, err
+					}
+					return toInterfaceChan(ch), nil
+				} else {
+					ch, err := s.WatchByType(p.Context, styp)
+					if err != nil {
+						return nil, err
+					}
+					return toInterfaceChan(ch), nil
+				}
+			},
+		}
 	}
 
 	rootQuery := graphql.NewObject(graphql.ObjectConfig{
 		Name:   "Query",
-		Fields: fields,
+		Fields: queryFields,
 	})
 
-	return graphql.NewSchema(graphql.SchemaConfig{
-		Query: rootQuery,
-		Types: types,
+	rootSubscription := graphql.NewObject(graphql.ObjectConfig{
+		Name:   "Subscription",
+		Fields: subscriptionFields,
 	})
+
+	schema, err := graphql.NewSchema(graphql.SchemaConfig{
+		Query:        rootQuery,
+		Subscription: rootSubscription,
+		Types:        types,
+	})
+
+	return schema, subscriptionStreams, err
 }
 
+func toInterfaceChan(in chan *store.Thing) <-chan interface{} {
+	out := make(chan interface{})
+	go func() {
+		for {
+			select {
+			case thing := <-in:
+				if thing == nil {
+					return
+				}
 
+				out <- interface{}(thing)
+			}
+		}
+	}()
+	return out
+}
 
-
-func pageAllTypes(ctx context.Context, fn func(context.Context, store.ListOptions)([]*store.Type, error)) ([]*store.Type, error) {
+func pageAllTypes(ctx context.Context, fn func(context.Context, store.ListOptions) ([]*store.Type, error)) ([]*store.Type, error) {
 	numResults := uint(10)
 	offset := uint(0)
 	currentOpts := store.ListOptions{
 		NumberOfResults: numResults,
-		Offset: offset,
+		Offset:          offset,
 	}
 
 	allTypes := []*store.Type{}

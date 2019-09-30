@@ -73,6 +73,7 @@ func TestAuditHappyPath(t *testing.T) {
 	doAuditMiddleware(t, 200, AuditEntry{
 		User: "wibble@bibble.com",
 		Data: AuditData{
+			"origin": "",
 			"method": "GET",
 			"path":   "/",
 			"query":  "",
@@ -84,6 +85,7 @@ func TestMissingUser(t *testing.T) {
 	doAuditMiddleware(t, 500, AuditEntry{
 		User: "",
 		Data: AuditData{
+			"origin": "",
 			"method": "GET",
 			"path":   "/",
 			"query":  "",

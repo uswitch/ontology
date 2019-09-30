@@ -24,10 +24,10 @@ type AuditEntry struct {
 	Data   AuditData
 }
 
-type Logger interface{
+type Logger interface {
 	middleware.Middleware
 
-	Log(context.Context,AuditData)
+	Log(context.Context, AuditData)
 }
 
 type auditLog struct {
@@ -60,6 +60,7 @@ func (al *auditLog) Middleware(next http.Handler) http.Handler {
 		newContext := context.WithValue(r.Context(), CallIDContextKey, callID)
 
 		al.Log(newContext, AuditData{
+			"origin": r.Header.Get("Origin"),
 			"method": r.Method,
 			"path":   r.URL.Path,
 			"query":  r.URL.RawQuery,

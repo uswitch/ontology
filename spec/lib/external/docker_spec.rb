@@ -1,7 +1,7 @@
 # coding: utf-8
 require 'rspec'
 
-require_relative '../../../lib/external/docker'
+require_relative '../../../lib/ontology/source/docker'
 
 # stolen from github.com/distribution/reference
 RSpec.describe "#parse_image_reference" do

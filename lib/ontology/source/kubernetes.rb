@@ -98,7 +98,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -120,7 +120,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -142,7 +142,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -164,7 +164,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -186,7 +186,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -220,7 +220,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {

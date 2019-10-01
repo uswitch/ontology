@@ -7,28 +7,28 @@ require 'open3'
 require_relative '../lib/ontology/source/docker.rb'
 
 if not ARGV.count == 2
-  $stderr.puts "scan-container snyk_org container"
+  $stderr.puts "scan-image snyk_org image_ref"
   exit 1
 end
 
 org = ARGV[0]
-container = ARGV[1]
+raw_image_ref = ARGV[1]
 
-ref = parse_image_reference(container)
-container_id = "/container/#{ref[:repository]}/#{ref[:tag]}"
+image_ref = parse_image_reference(raw_image_ref)
+image_id = "/image/container/#{image_ref[:repository]}/#{image_ref[:tag]}"
 
-# this block of code tries to work out whether we are looking up a container in Docker Hub,
+# this block of code tries to work out whether we are looking up a image in Docker Hub,
 # this is fairly naive. The spec docker parsing will still give you a domain for a hub looking ref
 # like `wibble/nginx:latest`, you'll  get wibble. I've made the choice that we won't support registry
 # domains with no dots in them, so that we can work out whether we are hub or not.
 
 # if we *are* connecting to the Hub then we need to grab a token from docker  in order to connect to
-# get container information
+# get image information
 
-repository = ref[:repository]
-domain = ref[:domain]
+repository = image_ref[:repository]
+domain = image_ref[:domain]
 token = nil
-if not ref[:domain].include?(".")
+if not image_ref[:domain].include?(".")
   if not repository.include?("/")
     repository = "library/#{repository}"
   end
@@ -37,28 +37,28 @@ if not ref[:domain].include?(".")
   token = tokenResponse["token"]
   domain = nil
 else
-  repository = ref[:repository].delete_prefix("#{ref[:domain]}/")
+  repository = image_ref[:repository].delete_prefix("#{image_ref[:domain]}/")
 end
 
 registry = Ontology::Source::DockerRegistry.new(domain, token=token)
 
-$stderr.puts "Loading container #{repository}:#{ref[:tag]} from #{registry.class.base_uri}"
+$stderr.puts "Loading image #{repository}:#{image_ref[:tag]} from #{registry.class.base_uri}"
 
-container_things = registry.container(repository, ref[:tag])
+image_things = registry.image(repository, image_ref[:tag])
 
 # we need to make sure we have the image locally as snyk won't pull it
 pullSucceeded = false
 until pullSucceeded
-  pullStdout, pullStatus = Open3.capture2('docker', 'pull', container)
+  pullStdout, pullStatus = Open3.capture2('docker', 'pull', raw_image_ref)
   pullSucceeded = pullStatus.success?
   if not pullSucceeded
     $stderr.puts pullStdout
   end
 end
 
-$stderr.puts "Getting vulnerabilities for container"
+$stderr.puts "Getting vulnerabilities for image"
 
-resultsRaw, resultsStatus = Open3.capture2('snyk', 'test', '--json', "--org=#{org}", '--docker', container)
+resultsRaw, resultsStatus = Open3.capture2('snyk', 'test', '--json', "--org=#{org}", '--docker', raw_image_ref)
 if resultsStatus.exitstatus == 2
   $stderr.puts resultsRaw
   exit 1
@@ -108,17 +108,17 @@ vulns = results[:vulnerabilities].map{ |vuln|
   vulns + same_as_relations + [
     {
       metadata: {
-        id: "#{container_id}/#{Digest::SHA1.hexdigest(snyk_id)}",
+        id: "#{image_id}/#{Digest::SHA1.hexdigest(snyk_id)}",
         type: "/relation/v1/is_vulnerable_to",
       },
       properties: {
-        a: container_id,
+        a: image_id,
         b: snyk_id,
       },
     }
   ]
 }
 
-(container_things + vulns).flatten.map {|thing|
+(image_things + vulns).flatten.map {|thing|
   puts JSON.generate(thing)
 }

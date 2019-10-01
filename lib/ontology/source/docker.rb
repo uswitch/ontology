@@ -89,11 +89,11 @@ module Ontology
         self.class.base_uri "https://#{domain}"
       end
 
-      def container(repo, tag)
+      def image(repo, tag)
         begin
           digest, manifest = manifest(repo, tag)
 
-          path = "/container/#{@prefix}#{repo}/#{digest}"
+          path = "/image/container/#{@prefix}#{repo}/#{digest}"
           labels = labels_from(manifest)
           relations = []
 
@@ -121,11 +121,10 @@ module Ontology
           alias_entity(
             {
               metadata: {
-                type: "/entity/v1/container",
+                type: "/entity/v1/image/container",
                 updated_at: updated_at,
               },
               properties: {
-                provider: "docker",
                 server: @domain,
                 repository: repo,
                 digest: digest,
@@ -134,7 +133,7 @@ module Ontology
             },
             id: path,
             aliases: [
-              "/container/#{@prefix}#{repo}/#{tag}",
+              "/image/container/#{@prefix}#{repo}/#{tag}",
             ],
           ) + add_ids_to(relations, base: path)
         rescue StandardError => e
@@ -149,7 +148,7 @@ module Ontology
         puts "Loading all repositories"
         Parallel.map(repositories, progress: "Getting all repositories", in_processes: 20) { |repo|
           Parallel.map(tags(repo)) { |tag|
-            container(repo, tag)
+            image(repo, tag)
           }
         }.flatten
       end

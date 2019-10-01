@@ -168,7 +168,7 @@ def eni_entity(resource)
           b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/#{instance_id}",
         },
       }
-    elsif interface_type == "interface" and description.start_with?("AWS Lambda VPC ENI")
+    elsif (interface_type == "interface" and description.start_with?("AWS Lambda VPC ENI")) or interface_type == "lambda"
       name = requester_id.split(":")[1]
 
       relations << {

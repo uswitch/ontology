@@ -2,6 +2,8 @@ require 'httparty'
 require 'ruby-progressbar'
 require 'uri'
 
+require_relative './utils.rb'
+
 #puts response.body, response.code, response.message, response.headers.inspect
 
 # stolen from github.com/distribution/reference
@@ -61,6 +63,8 @@ def next_link(response)
   return next_url
 end
 
+HUB_DOMAIN="registry-1.docker.io"
+
 module Ontology
 
   module Source
@@ -68,65 +72,83 @@ module Ontology
     class DockerRegistry
       include HTTParty
 
-      base_uri "https://registry.usw.co"
+      def initialize(domain, token=nil)
+        prefix = "#{domain}/"
+        if domain == nil
+          domain = HUB_DOMAIN
+          prefix = ""
+        end
+        @domain = domain
+        @prefix = prefix
+
+        @headers = {}
+        if token
+          @headers["Authorization"] = "Bearer #{token}"
+        end
+
+        self.class.base_uri "https://#{domain}"
+      end
+
+      def image(repo, tag)
+        begin
+          digest, manifest = manifest(repo, tag)
+
+          path = "/image/container/#{@prefix}#{repo}/#{digest}"
+          labels = labels_from(manifest)
+          relations = []
+
+          updated_at = DateTime.now.rfc3339
+
+          if labels.has_key?("org.label-schema.vcs-url")
+            vcs_uri = URI(labels["org.label-schema.vcs-url"])
+
+            without_ext = File.join(File.dirname(vcs_uri.path), File.basename(vcs_uri.path, ".*"))
+
+            relations << {
+              metadata: {
+                type: "/relation/v1/was_built_by",
+                updated_at: updated_at,
+              },
+              properties: {
+                a: path,
+                b: "/repository/#{vcs_uri.host}#{without_ext}",
+                ref: labels["org.label-schema.vcs-ref"],
+                at: labels["org.label-schema.build-date"],
+              }
+            }
+          end
+
+          alias_entity(
+            {
+              metadata: {
+                type: "/entity/v1/image/container",
+                updated_at: updated_at,
+              },
+              properties: {
+                server: @domain,
+                repository: repo,
+                digest: digest,
+                created_at: created_from(manifest),
+              },
+            },
+            id: path,
+            aliases: [
+              "/image/container/#{@prefix}#{repo}/#{tag}",
+            ],
+          ) + add_ids_to(relations, base: path)
+        rescue StandardError => e
+          $stderr.puts manifest
+          $stderr.puts e.message
+          $stderr.puts e.backtrace.inspect
+          []
+        end
+      end
 
       def sync
         puts "Loading all repositories"
         Parallel.map(repositories, progress: "Getting all repositories", in_processes: 20) { |repo|
           Parallel.map(tags(repo)) { |tag|
-            begin
-              digest, manifest = manifest(repo, tag)
-
-              path = "/container/registry.usw.co/#{repo}/#{digest}"
-              labels = labels_from(manifest)
-              relations = []
-
-              updated_at = DateTime.now.rfc3339
-
-              if labels.has_key?("org.label-schema.vcs-url")
-                vcs_uri = URI(labels["org.label-schema.vcs-url"])
-
-                without_ext = File.join(File.dirname(vcs_uri.path), File.basename(vcs_uri.path, ".*"))
-
-                relations << {
-                  metadata: {
-                    type: "/relation/v1/was_built_by",
-                    updated_at: updated_at,
-                  },
-                  properties: {
-                    a: path,
-                    b: "/repository/#{vcs_uri.host}#{without_ext}",
-                    ref: labels["org.label-schema.vcs-ref"],
-                    at: labels["org.label-schema.build-date"],
-                  }
-                }
-              end
-
-              alias_entity(
-                {
-                  metadata: {
-                    type: "/entity/v1/container",
-                    updated_at: updated_at,
-                  },
-                  properties: {
-                    provider: "docker",
-                    server: "registry.usw.co",
-                    repository: repo,
-                    digest: digest,
-                    created_at: created_from(manifest),
-                  },
-                },
-                id: path,
-                aliases: [
-                  "/container/registry.usw.co/#{repo}/#{tag}",
-                ],
-              ) + add_ids_to(relations, base: path)
-            rescue StandardError => e
-              $stderr.puts manifest
-              $stderr.puts e.message
-              $stderr.puts e.backtrace.inspect
-              {}
-            end
+            image(repo, tag)
           }
         }.flatten
       end
@@ -142,7 +164,7 @@ module Ontology
       def manifest(repo, ref)
         manifest = self.class.get(
           "/v2/#{repo}/manifests/#{ref}", {
-            headers: { "Accept" => "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.v1+json" },
+            headers: @headers.merge({ "Accept" => "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.v1+json" }),
             format: :json,
           })
 
@@ -160,7 +182,7 @@ module Ontology
         if manifest["config"]
           config = self.class.get(
             "/v2/#{repo}/blobs/#{manifest["config"]["digest"]}", {
-              headers: { "Accept" => "application/vnd.docker.distribution.manifest.v2+json" },
+              headers: @headers.merge({ "Accept" => "application/vnd.docker.distribution.manifest.v2+json" }),
               format: :json,
             })
 

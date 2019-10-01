@@ -8,7 +8,7 @@
         "spec": {
             "a": {
                 "type": "string",
-                "pointer_to": "/entity/v1/container",
+                "pointer_to": "/entity/v1/image",
                 "required": true
             },
             "b": {

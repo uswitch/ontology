@@ -42,7 +42,7 @@ def labels_to_relations(entitiy_id, updated_at, labels)
   labels.map { |tag, val|
     next if not tag.to_s.start_with? TAG_PREFIX
 
-    type = tag[TAG_PREFIX.length..-1]
+    type = tag[TAG_PREFIX.length..-1].gsub(/\./,"/")
 
     {
       metadata: {

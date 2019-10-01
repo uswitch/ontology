@@ -1,0 +1,124 @@
+#!/usr/bin/env ruby
+
+require 'digest'
+require 'json'
+require 'open3'
+
+require_relative '../lib/ontology/source/docker.rb'
+
+if not ARGV.count == 2
+  $stderr.puts "scan-image snyk_org image_ref"
+  exit 1
+end
+
+org = ARGV[0]
+raw_image_ref = ARGV[1]
+
+image_ref = parse_image_reference(raw_image_ref)
+image_id = "/image/container/#{image_ref[:repository]}/#{image_ref[:tag]}"
+
+# this block of code tries to work out whether we are looking up a image in Docker Hub,
+# this is fairly naive. The spec docker parsing will still give you a domain for a hub looking ref
+# like `wibble/nginx:latest`, you'll  get wibble. I've made the choice that we won't support registry
+# domains with no dots in them, so that we can work out whether we are hub or not.
+
+# if we *are* connecting to the Hub then we need to grab a token from docker  in order to connect to
+# get image information
+
+repository = image_ref[:repository]
+domain = image_ref[:domain]
+token = nil
+if not image_ref[:domain].include?(".")
+  if not repository.include?("/")
+    repository = "library/#{repository}"
+  end
+
+  tokenResponse = HTTParty.get("https://auth.docker.io/token?service=registry.docker.io&scope=repository:#{repository}:pull", format: :json)
+  token = tokenResponse["token"]
+  domain = nil
+else
+  repository = image_ref[:repository].delete_prefix("#{image_ref[:domain]}/")
+end
+
+registry = Ontology::Source::DockerRegistry.new(domain, token=token)
+
+$stderr.puts "Loading image #{repository}:#{image_ref[:tag]} from #{registry.class.base_uri}"
+
+image_things = registry.image(repository, image_ref[:tag])
+
+# we need to make sure we have the image locally as snyk won't pull it
+pullSucceeded = false
+until pullSucceeded
+  pullStdout, pullStatus = Open3.capture2('docker', 'pull', raw_image_ref)
+  pullSucceeded = pullStatus.success?
+  if not pullSucceeded
+    $stderr.puts pullStdout
+  end
+end
+
+$stderr.puts "Getting vulnerabilities for image"
+
+resultsRaw, resultsStatus = Open3.capture2('snyk', 'test', '--json', "--org=#{org}", '--docker', raw_image_ref)
+if resultsStatus.exitstatus == 2
+  $stderr.puts resultsRaw
+  exit 1
+end
+
+results = JSON.parse(resultsRaw, symbolize_names: true)
+
+def vuln_to_entity(id, vuln)
+  {
+    metadata: {
+      id: id,
+      type: "/entity/v1/vulnerability",
+    },
+    properties: {
+      cvvsScore: vuln[:cvssScore],
+      description: vuln[:description],
+    }
+  }
+end
+
+$stderr.puts "Parsing vulnerabilities and generating Ontology entries"
+
+# we want to reference the CVEs that the snyk vuln is related to
+# CVEs will be populated by downloading from nist
+vulns = results[:vulnerabilities].map{ |vuln|
+
+  snyk_id = "/vulnerability/snyk/#{vuln[:id]}"
+  cve_ids = vuln[:identifiers][:CVE].map{ |cve| "/vulnerability/cve/#{cve}" }
+
+  vulns = [vuln_to_entity(snyk_id, vuln)]
+
+  same_as = ([snyk_id] * cve_ids.count).zip(cve_ids)
+
+  same_as_relations = same_as.map { |snyk, cve|
+    {
+      metadata: {
+        id: "#{snyk}/#{Digest::SHA1.hexdigest(snyk+cve)}",
+        type: "/relation/v1/is_the_same_as",
+      },
+      properties: {
+        a: snyk,
+        b: cve,
+      }
+    }
+  }
+
+  vulns + same_as_relations + [
+    {
+      metadata: {
+        id: "#{image_id}/#{Digest::SHA1.hexdigest(snyk_id)}",
+        type: "/relation/v1/is_vulnerable_to",
+      },
+      properties: {
+        a: image_id,
+        b: snyk_id,
+      },
+    }
+  ]
+}
+
+(image_things + vulns).flatten.map {|thing|
+  puts JSON.generate(thing)
+}

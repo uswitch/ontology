@@ -22,7 +22,7 @@ def owner_relations(id, updated_at, server, metadata)
   end
 end
 
-def container_relations(id, updated_at, containers)
+def image_relations(id, updated_at, containers)
   containers.map { |container|
     parsed = parse_image_reference(container.image)
 
@@ -32,7 +32,7 @@ def container_relations(id, updated_at, containers)
       },
       properties: {
         a: id,
-        b: "/container/#{parsed[:repository]}/#{parsed[:digest] or parsed[:tag]}"
+        b: "/image/container/#{parsed[:repository]}/#{parsed[:digest] or parsed[:tag]}"
       }
     }
   }
@@ -98,7 +98,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -120,7 +120,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -142,7 +142,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -164,7 +164,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -186,7 +186,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {
@@ -211,7 +211,7 @@ module Ontology
               },
             },
           ] + (
-            container_relations(id, updated_at, pod.spec.containers) +
+            image_relations(id, updated_at, pod.spec.containers) +
             owner_relations(id, updated_at, server, pod.metadata) +
             labels_to_relations(id, updated_at, pod.metadata.annotations.to_h)
           )
@@ -220,7 +220,7 @@ module Ontology
             {
               metadata: {
                 id: id,
-                type: "/entity/v1/computer",
+                type: "/entity/v1/workload",
                 updated_at: updated_at,
               },
               properties: {

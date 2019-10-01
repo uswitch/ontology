@@ -1,0 +1,14 @@
+metadata:
+  type: /type
+  name: Is vulnerable to
+properties:
+  parent: /relation/v1
+  template: "{{{ a }}} is vulnerable to {{{ b }}}"
+  required: ["a", "b"]
+  spec:
+    a:
+      type: string
+      pointer_to: /entity/v1/workload
+    b:
+      type: string
+      pointer_to: /entity/v1/vulnerability

@@ -36,18 +36,56 @@ func NewLocalServer(url string) (store.Store, error) {
 		client: g,
 	}
 
-	return s, nil
+	err = s.Add(
+		context.TODO(),
+		store.TypeType.Thing(),
+		store.EntityType.Thing(),
+		store.RelationType.Thing(),
+	)
+
+	return s, err
+}
+
+func (s *localStore) execute(ctx context.Context, statement Statements) (interface{}, error) {
+	log.Println(statement.String())
+	return s.client.Execute(statement.String(), nil, nil)
 }
 
 func (s *localStore) Add(ctx context.Context, things ...store.Thingable) error {
 	return s.AddAll(ctx, things)
 }
-func (s *localStore) AddAll(context.Context, []store.Thingable) error {
-	return store.ErrUnimplemented
+func (s *localStore) AddAll(ctx context.Context, things []store.Thingable) error {
+	st := Graph()
+
+	for _, thingable := range things {
+		thing := thingable.Thing()
+
+		st = st.AddV(thing.Metadata.ID.String()).
+			AddE("/relation/type_of").From(thing.Metadata.ID.String()).To(thing.Metadata.Type.String())
+
+		if thing.Metadata.Type == store.TypeType.ID() {
+			st = st.AddE("/relation/subtype_of").From(thing.Metadata.ID.String()).To(thing.Properties["parent"].(string))
+		}
+	}
+
+	_, err := s.execute(ctx, Statements{st})
+
+	return err
 }
 
-func (s *localStore) Len(context.Context) (int, error) {
-	return 0, store.ErrUnimplemented
+func (s *localStore) Len(ctx context.Context) (int, error) {
+	query := Statements{
+		Assign("g", Graph()),
+		Var("g").V().Count(),
+	}
+
+	data, err := s.execute(ctx, query)
+
+	results := data.([]interface{})
+	values := results[0].([]interface{})
+	value := values[0].(map[string]interface{})
+
+	return int(value["@value"].(float64)), err
 }
 
 func (s *localStore) Types(context.Context, store.Thingable) ([]*store.Type, error) {

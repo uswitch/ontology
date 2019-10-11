@@ -41,6 +41,8 @@ func NewLocalServer(url string) (store.Store, error) {
 		store.TypeType.Thing(),
 		store.EntityType.Thing(),
 		store.RelationType.Thing(),
+		store.TypeOfType.Thing(),
+		store.SubtypeOfType.Thing(),
 	)
 
 	return s, err
@@ -48,35 +50,41 @@ func NewLocalServer(url string) (store.Store, error) {
 
 func (s *localStore) execute(ctx context.Context, statement Statements) (interface{}, error) {
 	log.Println(statement.String())
-	return s.client.Execute(statement.String(), nil, nil)
+	out, err := s.client.Execute(statement.String(), nil, nil)
+	log.Println(out, err)
+	return out, err
 }
 
 func (s *localStore) Add(ctx context.Context, things ...store.Thingable) error {
 	return s.AddAll(ctx, things)
 }
 func (s *localStore) AddAll(ctx context.Context, things []store.Thingable) error {
-	st := Graph()
+	//vStatement := Graph()
+	st := Var("g")
 
 	for _, thingable := range things {
 		thing := thingable.Thing()
+		id := thing.Metadata.ID.String()
 
-		st = st.AddV(thing.Metadata.ID.String()).
-			AddE("/relation/type_of").From(thing.Metadata.ID.String()).To(thing.Metadata.Type.String())
+		st = st.AddV(id).As(id).AddE(store.TypeOfType.ID().String()).To(Var("g").V().HasLabel(thing.Metadata.Type.String()))
 
-		if thing.Metadata.Type == store.TypeType.ID() {
-			st = st.AddE("/relation/subtype_of").From(thing.Metadata.ID.String()).To(thing.Properties["parent"].(string))
+		if parentID, hasParent := thing.Properties["parent"].(string); hasParent && thing.Metadata.Type == store.TypeType.ID() {
+			log.Println(parentID)
+			st = st.OutV().AddE(store.SubtypeOfType.ID().String()).To(Var("g").V().HasLabel(parentID))
 		}
 	}
 
-	_, err := s.execute(ctx, Statements{st})
+	_, err := s.execute(ctx, Statements{
+		Assign("g", Graph()),
+		st,
+	})
 
 	return err
 }
 
 func (s *localStore) Len(ctx context.Context) (int, error) {
 	query := Statements{
-		Assign("g", Graph()),
-		Var("g").V().Count(),
+		Graph().V().Count(),
 	}
 
 	data, err := s.execute(ctx, query)
@@ -88,7 +96,17 @@ func (s *localStore) Len(ctx context.Context) (int, error) {
 	return int(value["@value"].(float64)), err
 }
 
-func (s *localStore) Types(context.Context, store.Thingable) ([]*store.Type, error) {
+func (s *localStore) Types(ctx context.Context, thingable store.Thingable) ([]*store.Type, error) {
+	thing := thingable.Thing()
+
+	data, err := s.execute(ctx, Statements{
+		Graph().V().
+			HasLabel(thing.Thing().ID().String()).
+			OutE(store.TypeOfType.ID().String()).
+			InV(),
+	})
+	log.Println(data, err)
+
 	return nil, store.ErrUnimplemented
 }
 
@@ -100,8 +118,23 @@ func (s *localStore) Inherits(context.Context, *store.Type, *store.Type) (bool, 
 	return false, store.ErrUnimplemented
 }
 
-func (s *localStore) IsA(context.Context, store.Thingable, *store.Type) (bool, error) {
-	return false, store.ErrUnimplemented
+func (s *localStore) IsA(ctx context.Context, thingable store.Thingable, t *store.Type) (bool, error) {
+	if t == store.TypeType {
+		return thingable.Thing().Metadata.Type == t.Metadata.ID, nil
+	}
+
+	types, err := s.Types(ctx, thingable)
+	if err != nil {
+		return false, err
+	}
+
+	for _, typ := range types {
+		if typ.Metadata.ID == t.Metadata.ID {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s *localStore) Validate(context.Context, store.Thingable, store.ValidateOptions) ([]store.ValidationError, error) {

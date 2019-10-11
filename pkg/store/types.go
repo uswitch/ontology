@@ -145,6 +145,28 @@ var (
 			"required": []string{"a", "b"},
 		},
 	}
+
+	TypeOfType = &Type{
+		Metadata: Metadata{
+			ID:   ID("/relation/type_of"),
+			Type: ID("/type"),
+			Name: "TypeOF",
+		},
+		Properties: Properties{
+			"parent": "/relation",
+		},
+	}
+
+	SubtypeOfType = &Type{
+		Metadata: Metadata{
+			ID:   ID("/relation/subtype_of"),
+			Type: ID("/type"),
+			Name: "SubtypeOF",
+		},
+		Properties: Properties{
+			"parent": "/relation",
+		},
+	}
 )
 
 type SortOrder uint

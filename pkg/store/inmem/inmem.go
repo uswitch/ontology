@@ -27,9 +27,14 @@ func NewInMemoryStore() store.Store {
 
 	ctx := context.TODO()
 
-	s.Add(ctx, store.TypeType.Thing())
-	s.Add(ctx, store.EntityType.Thing())
-	s.Add(ctx, store.RelationType.Thing())
+	s.Add(
+		ctx,
+		store.TypeType.Thing(),
+		store.EntityType.Thing(),
+		store.RelationType.Thing(),
+		store.TypeOfType.Thing(),
+		store.SubtypeOfType.Thing(),
+	)
 
 	return s
 }

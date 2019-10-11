@@ -65,6 +65,12 @@ func (s Statement) V() Statement {
 	}
 }
 
+func (s Statement) V1(inner string) Statement {
+	return Statement{
+		parts: append(s.parts, fmt.Sprintf("V('%s')", inner)),
+	}
+}
+
 func (s Statement) E() Statement {
 	return Statement{
 		parts: append(s.parts, "E()"),
@@ -83,9 +89,33 @@ func (s Statement) Iterate() Statement {
 	}
 }
 
+func (s Statement) Next() Statement {
+	return Statement{
+		parts: append(s.parts, "next()"),
+	}
+}
+
 func (s Statement) Count() Statement {
 	return Statement{
 		parts: append(s.parts, "count()"),
+	}
+}
+
+func (s Statement) OutE(id string) Statement {
+	return Statement{
+		parts: append(s.parts, fmt.Sprintf("outE('%s')", id)),
+	}
+}
+
+func (s Statement) InV() Statement {
+	return Statement{
+		parts: append(s.parts, "inV()"),
+	}
+}
+
+func (s Statement) OutV() Statement {
+	return Statement{
+		parts: append(s.parts, "outV()"),
 	}
 }
 
@@ -112,15 +142,27 @@ func (s Statement) AddE(label string) Statement {
 	}
 }
 
+func (s Statement) As(label string) Statement {
+	return Statement{
+		parts: append(s.parts, fmt.Sprintf("as('%s')", label)),
+	}
+}
+
+func (s Statement) HasLabel(label string) Statement {
+	return Statement{
+		parts: append(s.parts, fmt.Sprintf("hasLabel('%s')", label)),
+	}
+}
+
 func (s Statement) From(label string) Statement {
 	return Statement{
 		parts: append(s.parts, fmt.Sprintf("from('%s')", label)),
 	}
 }
 
-func (s Statement) To(label string) Statement {
+func (s Statement) To(label Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("to('%s')", label)),
+		parts: append(s.parts, fmt.Sprintf("to(%s)", label.String())),
 	}
 }
 

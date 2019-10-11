@@ -1,6 +1,7 @@
 package gremlin
 
 import (
+	"context"
 	"testing"
 
 	"github.com/uswitch/ontology/pkg/store"
@@ -32,6 +33,15 @@ func TestConformance(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to drop all vertices: %v", err)
 		}
+
+		err = s.Add(
+			context.TODO(),
+			store.TypeType.Thing(),
+			store.EntityType.Thing(),
+			store.RelationType.Thing(),
+			store.TypeOfType.Thing(),
+			store.SubtypeOfType.Thing(),
+		)
 
 		return s
 	})

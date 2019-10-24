@@ -2,12 +2,18 @@ package gremlin
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
+	"time"
 
+	"github.com/kr/pretty"
 	"github.com/qasaur/gremgo"
 
 	"github.com/uswitch/ontology/pkg/store"
 )
+
+const DATE_LAYOUT = "2006-01-02T15:04:05.000Z"
 
 type localStore struct {
 	typeBroadcast *store.Broadcast
@@ -48,11 +54,31 @@ func NewLocalServer(url string) (store.Store, error) {
 	return s, err
 }
 
-func (s *localStore) execute(ctx context.Context, statement Statements) (interface{}, error) {
+func (s *localStore) execute(ctx context.Context, statement Statements) ([]interface{}, error) {
 	log.Println(statement.String())
+
 	out, err := s.client.Execute(statement.String(), nil, nil)
-	log.Println(out, err)
-	return out, err
+	//pretty.Println(out, err)
+	if err != nil {
+		return nil, err
+	}
+
+	results, ok := out.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("Failed to get results from data: %v", out)
+	}
+
+	pretty.Println(results)
+
+	if values, ok := results[0].([]interface{}); ok {
+		return values, nil
+	} else if err, ok := results[0].(error); ok {
+		return nil, err
+	} else if results[0] == nil {
+		return []interface{}{}, nil
+	} else {
+		return nil, fmt.Errorf("Failed to get values from result: %v", results[0])
+	}
 }
 
 func (s *localStore) Add(ctx context.Context, things ...store.Thingable) error {
@@ -66,10 +92,18 @@ func (s *localStore) AddAll(ctx context.Context, things []store.Thingable) error
 		thing := thingable.Thing()
 		id := thing.Metadata.ID.String()
 
-		st = st.AddV(id).As(id).AddE(store.TypeOfType.ID().String()).To(Var("g").V().HasLabel(thing.Metadata.Type.String()))
+		jsonProperties, err := json.Marshal(thing.Properties)
+		if err != nil {
+			return err
+		}
+
+		st = st.AddV(id).As(id).
+			Property("name", thing.Metadata.Name).
+			Property("updated_at", thing.Metadata.UpdatedAt.Format(DATE_LAYOUT)).
+			Property("properties", string(jsonProperties)).
+			AddE(store.TypeOfType.ID().String()).To(Var("g").V().HasLabel(thing.Metadata.Type.String()))
 
 		if parentID, hasParent := thing.Properties["parent"].(string); hasParent && thing.Metadata.Type == store.TypeType.ID() {
-			log.Println(parentID)
 			st = st.OutV().AddE(store.SubtypeOfType.ID().String()).To(Var("g").V().HasLabel(parentID))
 		}
 	}
@@ -87,31 +121,175 @@ func (s *localStore) Len(ctx context.Context) (int, error) {
 		Graph().V().Count(),
 	}
 
-	data, err := s.execute(ctx, query)
+	values, err := s.execute(ctx, query)
 
-	results := data.([]interface{})
-	values := results[0].([]interface{})
 	value := values[0].(map[string]interface{})
 
 	return int(value["@value"].(float64)), err
 }
 
 func (s *localStore) Types(ctx context.Context, thingable store.Thingable) ([]*store.Type, error) {
-	thing := thingable.Thing()
+	/*thing := thingable.Thing()
 
 	data, err := s.execute(ctx, Statements{
 		Graph().V().
 			HasLabel(thing.Thing().ID().String()).
-			OutE(store.TypeOfType.ID().String()).
-			InV(),
-	})
-	log.Println(data, err)
+			Repeat(
+				BothE(store.TypeOfType.ID().String()).OtherV().SimplePath(),
+			).
+			Emit(),
+	})*/
 
 	return nil, store.ErrUnimplemented
 }
 
-func (s *localStore) TypeHierarchy(context.Context, *store.Type) ([]*store.Type, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) TypeHierarchy(ctx context.Context, typ *store.Type) ([]*store.Type, error) {
+	return s.typeHierarchy(ctx, typ.ID())
+}
+
+func thingQuery(s Statement) Statement {
+	return s.As("thing").OutE(store.TypeOfType.ID().String()).OtherV().As("type").Select("thing", "type")
+}
+
+func propertiesLoader(rawProps map[string]interface{}) (map[string]interface{}, error) {
+	props := map[string]interface{}{}
+
+	for k, rawProp := range rawProps {
+		randomArray, ok := rawProp.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("Failed to cast random array")
+		}
+
+		vertexProp, ok := randomArray[0].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("Failed to cast vertex prop")
+		}
+
+		vpValue, ok := vertexProp["@value"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("Failed to cast vpCalue")
+		}
+
+		props[k] = vpValue["value"]
+	}
+
+	return props, nil
+}
+
+func vertexLoader(v map[string]interface{}) (*store.Thing, error) {
+	values, ok := v["@value"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("Failed to get @value: %v", v["@value"])
+	}
+
+	id, ok := values["label"].(string)
+	if !ok {
+		return nil, fmt.Errorf("Failed to cast label: %v", values["label"])
+	}
+
+	// TODO: pull in name, updated at and properties
+	rawProps, ok := values["properties"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("failed to cast properties: %v", values["properties"])
+	}
+
+	props, err := propertiesLoader(rawProps)
+	if err != nil {
+		return nil, err
+	}
+
+	name, ok := props["name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast name: %v", props["name"])
+	}
+	updatedAtString, ok := props["updated_at"].(string)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast updated_at: %v", props["updated_at"])
+	}
+	jsonProperties, ok := props["properties"].(string)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast json properties: %v", props["properties"])
+	}
+
+	updatedAt, err := time.Parse(DATE_LAYOUT, updatedAtString)
+	if err != nil {
+		return nil, err
+	}
+
+	thing := &store.Thing{
+		Metadata: store.Metadata{
+			ID:        store.ID(id),
+			Name:      name,
+			UpdatedAt: updatedAt,
+		},
+		Properties: store.Properties{},
+	}
+
+	if err := json.Unmarshal([]byte(jsonProperties), &thing.Properties); err != nil {
+		return nil, err
+	}
+
+	return thing, nil
+}
+
+func thingLoader(datum map[string]interface{}) (*store.Thing, error) {
+	rawTyp, ok := datum["type"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("Failed to get type: %v", datum["type"])
+	}
+	typ, err := vertexLoader(rawTyp)
+	if err != nil {
+		return nil, err
+	}
+
+	rawThing, ok := datum["thing"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("Failed to get thing: %v", datum["type"])
+	}
+	thing, err := vertexLoader(rawThing)
+	if err != nil {
+		return nil, err
+	}
+
+	thing.Metadata.Type = typ.Metadata.ID
+
+	return thing, nil
+}
+
+func (s *localStore) typeHierarchy(ctx context.Context, typID store.ID) ([]*store.Type, error) {
+	results, err := s.execute(ctx, Statements{
+		Graph().V().
+			HasLabel(typID.String()).
+			As("a").
+			Union(
+				thingQuery(Select("a")),
+				Repeat(
+					thingQuery(OutE(store.SubtypeOfType.ID().String()).OtherV()),
+				).
+					Until(
+						InE(store.SubtypeOfType.ID().String()).Count().Is(0),
+					).
+					Emit(),
+			),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	typs := make([]*store.Type, len(results))
+
+	for idx, rawEntry := range results {
+		rawMap := rawEntry.(map[string]interface{})
+		thing, err := thingLoader(rawMap)
+		if err != nil {
+			return nil, err
+		}
+
+		typs[idx] = (*store.Type)(thing)
+	}
+
+	return typs, nil
 }
 
 func (s *localStore) Inherits(context.Context, *store.Type, *store.Type) (bool, error) {
@@ -123,7 +301,7 @@ func (s *localStore) IsA(ctx context.Context, thingable store.Thingable, t *stor
 		return thingable.Thing().Metadata.Type == t.Metadata.ID, nil
 	}
 
-	types, err := s.Types(ctx, thingable)
+	types, err := s.typeHierarchy(ctx, thingable.Thing().Metadata.Type)
 	if err != nil {
 		return false, err
 	}
@@ -137,24 +315,66 @@ func (s *localStore) IsA(ctx context.Context, thingable store.Thingable, t *stor
 	return false, nil
 }
 
-func (s *localStore) Validate(context.Context, store.Thingable, store.ValidateOptions) ([]store.ValidationError, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) Validate(ctx context.Context, t store.Thingable, opts store.ValidateOptions) ([]store.ValidationError, error) {
+	return store.Validate(ctx, s, t, opts)
 }
 
-func (s *localStore) GetByID(context.Context, store.IDable) (*store.Thing, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) GetByID(ctx context.Context, idable store.IDable) (*store.Thing, error) {
+	results, err := s.execute(ctx, Statements{
+		thingQuery(Graph().V().
+			HasLabel(idable.ID().String())),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) == 0 {
+		return nil, store.ErrNotFound
+	}
+
+	rawMap, ok := results[0].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("Failed to cast result")
+	}
+
+	return thingLoader(rawMap)
 }
 
-func (s *localStore) GetEntityByID(context.Context, store.IDable) (*store.Entity, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) GetEntityByID(ctx context.Context, idable store.IDable) (*store.Entity, error) {
+	if thing, err := s.GetByID(ctx, idable); err != nil {
+		return nil, err
+	} else if ok, err := s.IsA(ctx, thing, store.EntityType); !ok {
+		return nil, store.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	} else {
+		return (*store.Entity)(thing), nil
+	}
 }
 
-func (s *localStore) GetRelationByID(context.Context, store.IDable) (*store.Relation, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) GetRelationByID(ctx context.Context, idable store.IDable) (*store.Relation, error) {
+	if thing, err := s.GetByID(ctx, idable); err != nil {
+		return nil, err
+	} else if ok, err := s.IsA(ctx, thing, store.RelationType); !ok {
+		return nil, store.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	} else {
+		return (*store.Relation)(thing), nil
+	}
 }
 
-func (s *localStore) GetTypeByID(context.Context, store.IDable) (*store.Type, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) GetTypeByID(ctx context.Context, idable store.IDable) (*store.Type, error) {
+	if thing, err := s.GetByID(ctx, idable); err != nil {
+		return nil, err
+	} else if ok, err := s.IsA(ctx, thing, store.TypeType); !ok {
+		return nil, store.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	} else {
+		return (*store.Type)(thing), nil
+	}
 }
 
 func (s *localStore) List(context.Context, store.ListOptions) ([]*store.Thing, error) {

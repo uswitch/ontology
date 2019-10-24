@@ -10,9 +10,9 @@ import (
 
 func Conformance(t *testing.T, newStore func() store.Store) {
 	tests := map[string]func(*testing.T, store.Store){
-		"Len": TestLen,
-		"IsA": TestIsA,
-		/*"AddAndGet":      TestAddAndGet,
+		/*"Len":            TestLen,
+		"IsA":            TestIsA,
+		"AddAndGet":      TestAddAndGet,
 		"GetCorrectType": TestGetCorrectType,
 		"GetNotFound":    TestGetNotFound,
 
@@ -23,11 +23,11 @@ func Conformance(t *testing.T, newStore func() store.Store) {
 		"ListRelationsForEntityBadType":  TestListRelationsForEntityBadType,
 
 		"WatchByID":   TestWatchByID,
-		"WatchByType": TestWatchByType,
+		"WatchByType": TestWatchByType,*/
 
-		"TypeProperties": TestTypeProperties,
+		//"TypeProperties": TestTypeProperties,
 
-		"Validate": TestValidate,*/
+		"Validate": TestValidate,
 	}
 
 	for name, test := range tests {
@@ -182,7 +182,7 @@ func TestGetCorrectType(t *testing.T, s store.Store) {
 		entity("/wibble/bibble/1"),
 		relation("/wibble/bibble/2"),
 		ntype("/wibble/bibble/3"),
-		thingWithType("/wibble/bibble/4", "/type/", nil),
+		//	thingWithType("/wibble/bibble/4", "/type/", nil),
 	); err != nil {
 		t.Fatalf("Couldn't add to store: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestGetCorrectType(t *testing.T, s store.Store) {
 	}
 	// /wibble/bibble/3 NOT TYPE TYPE
 
-	if _, err := s.GetEntityByID(ctx, store.ID("/wibble/bibble/4")); err == nil {
+	/*if _, err := s.GetEntityByID(ctx, store.ID("/wibble/bibble/4")); err == nil {
 		t.Errorf("should not have been able to retrieve an entity, it's not a type")
 	} else if err != store.ErrNotFound {
 		t.Error(err)
@@ -258,7 +258,7 @@ func TestGetCorrectType(t *testing.T, s store.Store) {
 		t.Errorf("should not have been able to retrieve a type, it's not a type")
 	} else if err != store.ErrNotFound {
 		t.Error(err)
-	}
+	}*/
 }
 
 func TestGetNotFound(t *testing.T, s store.Store) {

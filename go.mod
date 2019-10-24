@@ -6,6 +6,7 @@ require (
 	github.com/coreos/go-oidc v2.0.0+incompatible
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/websocket v1.4.1 // indirect
+	github.com/kr/pretty v0.1.0
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
 	github.com/qasaur/gremgo v0.0.0-20180719101618-fa23ada7c5da
 	github.com/qri-io/jsonschema v0.1.1

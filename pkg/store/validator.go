@@ -58,9 +58,13 @@ func TypeProperties(ctx context.Context, s Store, typ *Type) (jsonschema.Propert
 	requiredSet := map[string]struct{}{}
 
 	for currType := typ; ; {
-		if required, ok := currType.Properties["required"].([]string); ok {
+		if required, ok := currType.Properties["required"].([]interface{}); ok {
 			for _, f := range required {
-				requiredSet[f] = struct{}{}
+				if fstr, ok := f.(string); ok {
+					requiredSet[fstr] = struct{}{}
+				} else {
+					return nil, nil, fmt.Errorf("couldn't cast required field to string: %v", required)
+				}
 			}
 		}
 

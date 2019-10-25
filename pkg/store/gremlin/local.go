@@ -258,19 +258,19 @@ func thingLoader(datum map[string]interface{}) (*store.Thing, error) {
 
 func (s *localStore) typeHierarchy(ctx context.Context, typID store.ID) ([]*store.Type, error) {
 	results, err := s.execute(ctx, Statements{
-		Graph().V().
+		thingQuery(Graph().V().
 			HasLabel(typID.String()).
 			As("a").
 			Union(
-				thingQuery(Select("a")),
+				Select("a"),
 				Repeat(
-					thingQuery(OutE(store.SubtypeOfType.ID().String()).OtherV()),
+					OutE(store.SubtypeOfType.ID().String()).OtherV(),
 				).
 					Until(
 						InE(store.SubtypeOfType.ID().String()).Count().Is(0),
 					).
 					Emit(),
-			),
+			)),
 	})
 
 	if err != nil {

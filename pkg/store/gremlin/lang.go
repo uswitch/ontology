@@ -71,6 +71,11 @@ func InE(label string) Statement {
 		parts: []string{fmt.Sprintf("inE('%s')", label)},
 	}
 }
+func (s Statement) InE(label string) Statement {
+	return Statement{
+		parts: append(s.parts, fmt.Sprintf("inE('%s')", label)),
+	}
+}
 func OutE(label string) Statement {
 	return Statement{
 		parts: []string{fmt.Sprintf("outE('%s')", label)},
@@ -193,6 +198,22 @@ func (s Statement) Emit() Statement {
 	}
 }
 
+func (s Statement) Order() Statement {
+	return Statement{
+		parts: append(s.parts, "order()"),
+	}
+}
+
+func (s Statement) By(k, v string) Statement {
+	return Statement{
+		parts: append(s.parts, fmt.Sprintf("by(%s, %s)", k, v)),
+	}
+}
+func (s Statement) Range(k, v uint) Statement {
+	return Statement{
+		parts: append(s.parts, fmt.Sprintf("range(%d, %d)", k, v)),
+	}
+}
 func (s Statement) Has(k, v string) Statement {
 	return Statement{
 		parts: append(s.parts, fmt.Sprintf("has('%s', '%s')", k, v)),

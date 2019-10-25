@@ -377,24 +377,115 @@ func (s *localStore) GetTypeByID(ctx context.Context, idable store.IDable) (*sto
 	}
 }
 
-func (s *localStore) List(context.Context, store.ListOptions) ([]*store.Thing, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) List(ctx context.Context, options store.ListOptions) ([]*store.Thing, error) {
+	return s.ListByType(ctx, nil, options)
 }
 
-func (s *localStore) ListByType(context.Context, *store.Type, store.ListOptions) ([]*store.Thing, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) ListByType(ctx context.Context, typ *store.Type, options store.ListOptions) ([]*store.Thing, error) {
+	if options.NumberOfResults == 0 {
+		options.NumberOfResults = store.DefaultNumberOfResults
+	}
+
+	var order string
+
+	switch options.SortOrder {
+	case store.SortAscending:
+		order = "asc"
+	case store.SortDescending:
+		order = "desc"
+	default:
+		return []*store.Thing{}, store.ErrUnimplemented
+	}
+
+	query := Graph().V()
+
+	if typ != nil {
+		typID := typ.ID()
+		query = Graph().V().
+			HasLabel(typID.String()).
+			As("a").
+			Union(
+				Select("a"),
+				Repeat(
+					OutE(store.SubtypeOfType.ID().String()).OtherV(),
+				).
+					Until(
+						InE(store.SubtypeOfType.ID().String()).Count().Is(0),
+					).
+					Emit(),
+			).
+			InE(store.TypeOfType.ID().String()).OtherV()
+	}
+
+	results, err := s.execute(ctx, Statements{
+		thingQuery(
+			query.Order().By("label", order).
+				Range(options.Offset, options.Offset+options.NumberOfResults),
+		),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	things := make([]*store.Thing, len(results))
+
+	for idx, rawEntry := range results {
+		rawMap := rawEntry.(map[string]interface{})
+		thing, err := thingLoader(rawMap)
+		if err != nil {
+			return nil, err
+		}
+
+		things[idx] = thing
+	}
+
+	return things, nil
 }
 
-func (s *localStore) ListEntities(context.Context, store.ListOptions) ([]*store.Entity, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) ListEntities(ctx context.Context, options store.ListOptions) ([]*store.Entity, error) {
+	things, err := s.ListByType(ctx, store.EntityType, options)
+	entities := make([]*store.Entity, len(things))
+
+	if err != nil {
+		return entities, nil
+	}
+
+	for idx, thing := range things {
+		entities[idx] = (*store.Entity)(thing)
+	}
+
+	return entities, nil
 }
 
-func (s *localStore) ListRelations(context.Context, store.ListOptions) ([]*store.Relation, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) ListRelations(ctx context.Context, options store.ListOptions) ([]*store.Relation, error) {
+	things, err := s.ListByType(ctx, store.RelationType, options)
+	relations := make([]*store.Relation, len(things))
+
+	if err != nil {
+		return relations, nil
+	}
+
+	for idx, thing := range things {
+		relations[idx] = (*store.Relation)(thing)
+	}
+
+	return relations, nil
 }
 
-func (s *localStore) ListTypes(context.Context, store.ListOptions) ([]*store.Type, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) ListTypes(ctx context.Context, options store.ListOptions) ([]*store.Type, error) {
+	things, err := s.ListByType(ctx, store.TypeType, options)
+	types := make([]*store.Type, len(things))
+
+	if err != nil {
+		return types, nil
+	}
+
+	for idx, thing := range things {
+		types[idx] = (*store.Type)(thing)
+	}
+
+	return types, nil
 }
 
 func (s *localStore) ListRelationsForEntity(context.Context, *store.Type, *store.Entity, store.ListOptions) ([]*store.Relation, error) {

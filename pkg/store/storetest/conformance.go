@@ -10,22 +10,22 @@ import (
 
 func Conformance(t *testing.T, newStore func() store.Store) {
 	tests := map[string]func(*testing.T, store.Store){
-		/*"Len":            TestLen,
+		"Len":            TestLen,
 		"IsA":            TestIsA,
 		"AddAndGet":      TestAddAndGet,
 		"GetCorrectType": TestGetCorrectType,
 		"GetNotFound":    TestGetNotFound,
 
-		"List":                           TestList,
-		"ListByType":                     TestListByType,
-		"ListRelationsForEntity":         TestListRelationsForEntity,
+		"List":       TestList,
+		"ListByType": TestListByType,
+		/*"ListRelationsForEntity":         TestListRelationsForEntity,
 		"ListRelationsForEntityWithType": TestListRelationsForEntityWithType,
 		"ListRelationsForEntityBadType":  TestListRelationsForEntityBadType,
 
 		"WatchByID":   TestWatchByID,
 		"WatchByType": TestWatchByType,*/
 
-		//"TypeProperties": TestTypeProperties,
+		"TypeProperties": TestTypeProperties,
 
 		"Validate": TestValidate,
 	}
@@ -296,10 +296,13 @@ func assertList(t *testing.T, ctx context.Context, listFunc func(context.Context
 	}
 
 	if len(things) != expectedSize {
-		t.Fatalf("expected %d things, got %d\n%+v", expectedSize, len(things), things)
+		t.Errorf("expected %d things, got %d\n%+v", expectedSize, len(things), things)
 	}
 
 	for idx, thing := range things {
+		if idx >= len(expectedIDs) {
+			break
+		}
 		expectedID := store.ID(expectedIDs[idx])
 		actualID := thing.Metadata.ID
 
@@ -461,25 +464,31 @@ func TestList(t *testing.T, s store.Store) {
 	}
 
 	// default sort order is ascending
-	assertList(t, ctx, s.List, store.ListOptions{}, 4, []string{
+	assertList(t, ctx, s.List, store.ListOptions{}, 6, []string{
 		"/entity",
 		"/relation",
+		"/relation/subtype_of",
+		"/relation/type_of",
 		"/type",
 		"/wibble",
 	})
 
 	// test descending correctly works
-	assertList(t, ctx, s.List, store.ListOptions{SortOrder: store.SortDescending}, 4, []string{
+	assertList(t, ctx, s.List, store.ListOptions{SortOrder: store.SortDescending}, 6, []string{
 		"/wibble",
 		"/type",
+		"/relation/type_of",
+		"/relation/subtype_of",
 		"/relation",
 		"/entity",
 	})
 
 	// ask for too many results
-	assertList(t, ctx, s.List, store.ListOptions{NumberOfResults: 1000}, 4, []string{
+	assertList(t, ctx, s.List, store.ListOptions{NumberOfResults: 1000}, 6, []string{
 		"/entity",
 		"/relation",
+		"/relation/subtype_of",
+		"/relation/type_of",
 		"/type",
 		"/wibble",
 	})
@@ -496,7 +505,7 @@ func TestList(t *testing.T, s store.Store) {
 	})
 
 	// offset the overlaps the end
-	assertList(t, ctx, s.List, store.ListOptions{NumberOfResults: 3, Offset: 3}, 1, []string{
+	assertList(t, ctx, s.List, store.ListOptions{NumberOfResults: 3, Offset: 5}, 1, []string{
 		"/wibble",
 	})
 
@@ -607,23 +616,29 @@ func TestListByType(t *testing.T, s store.Store) {
 	listTypes := listByType(s, store.TypeType)
 
 	// default sort order is ascending
-	assertList(t, ctx, listTypes, store.ListOptions{}, 3, []string{
+	assertList(t, ctx, listTypes, store.ListOptions{}, 5, []string{
 		"/entity",
 		"/relation",
+		"/relation/subtype_of",
+		"/relation/type_of",
 		"/type",
 	})
 
 	// test descending correctly works
-	assertList(t, ctx, listTypes, store.ListOptions{SortOrder: store.SortDescending}, 3, []string{
+	assertList(t, ctx, listTypes, store.ListOptions{SortOrder: store.SortDescending}, 5, []string{
 		"/type",
+		"/relation/type_of",
+		"/relation/subtype_of",
 		"/relation",
 		"/entity",
 	})
 
 	// ask for too many results
-	assertList(t, ctx, listTypes, store.ListOptions{NumberOfResults: 1000}, 3, []string{
+	assertList(t, ctx, listTypes, store.ListOptions{NumberOfResults: 1000}, 5, []string{
 		"/entity",
 		"/relation",
+		"/relation/subtype_of",
+		"/relation/type_of",
 		"/type",
 	})
 

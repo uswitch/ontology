@@ -97,14 +97,34 @@ func (s *localStore) AddAll(ctx context.Context, things []store.Thingable) error
 			return err
 		}
 
-		st = st.AddV(id).As(id).
-			Property("name", thing.Metadata.Name).
-			Property("updated_at", thing.Metadata.UpdatedAt.Format(DATE_LAYOUT)).
-			Property("properties", string(jsonProperties)).
-			AddE(store.TypeOfType.ID().String()).To(Var("g").V().HasLabel(thing.Metadata.Type.String()))
+		isARelation, err := s.IsA(ctx, thing, store.RelationType)
+		if err != nil {
+			return err
+		}
 
-		if parentID, hasParent := thing.Properties["parent"].(string); hasParent && thing.Metadata.Type == store.TypeType.ID() {
-			st = st.OutV().AddE(store.SubtypeOfType.ID().String()).To(Var("g").V().HasLabel(parentID))
+		if isARelation {
+			if thing.Properties["a"] == nil || thing.Properties["b"] == nil {
+				return fmt.Errorf("A relation needs both an a and b property: %v", thing.Properties)
+			}
+
+			st = st.AddE(String(thing.ID())).
+				From(Keyword("g").V().HasLabel(String(thing.Properties["a"]))).
+				To(Keyword("g").V().HasLabel(String(thing.Properties["b"]))).
+				Property(String("name"), String(thing.Metadata.Name)).
+				Property(String("type"), String(thing.Metadata.Type)).
+				Property(String("updated_at"), String(thing.Metadata.UpdatedAt.Format(DATE_LAYOUT))).
+				Property(String("properties"), String(jsonProperties))
+		} else {
+
+			st = st.AddV(String(id)).
+				Property(String("name"), String(thing.Metadata.Name)).
+				Property(String("updated_at"), String(thing.Metadata.UpdatedAt.Format(DATE_LAYOUT))).
+				Property(String("properties"), String(jsonProperties)).
+				AddE(String(store.TypeOfType.ID())).To(Var("g").V().HasLabel(String(thing.Metadata.Type))).Property(String("hidden"), Keyword("true"))
+
+			if parentID, hasParent := thing.Properties["parent"].(string); hasParent && thing.Metadata.Type == store.TypeType.ID() {
+				st = st.OutV().AddE(String(store.SubtypeOfType.ID())).To(Var("g").V().HasLabel(String(parentID))).Property(String("hidden"), Keyword("true"))
+			}
 		}
 	}
 
@@ -148,21 +168,31 @@ func (s *localStore) TypeHierarchy(ctx context.Context, typ *store.Type) ([]*sto
 }
 
 func thingQuery(s Statement) Statement {
-	return s.As("thing").OutE(store.TypeOfType.ID().String()).OtherV().As("type").Select("thing", "type")
+	return s.As("thing").OutE(String(store.TypeOfType.ID().String())).OtherV().As("type").Select("thing", "type")
+}
+
+func relationQuery(s Statement) Statement {
+	return s.As("thing").V().Has(Keyword("label"), Within(s.Values(String("type")).ToList())).As("type").Select("thing", "type")
 }
 
 func propertiesLoader(rawProps map[string]interface{}) (map[string]interface{}, error) {
 	props := map[string]interface{}{}
 
 	for k, rawProp := range rawProps {
-		randomArray, ok := rawProp.([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("Failed to cast random array")
-		}
+		var vertexProp map[string]interface{}
 
-		vertexProp, ok := randomArray[0].(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("Failed to cast vertex prop")
+		switch typedProp := rawProp.(type) {
+		case []interface{}:
+			var ok bool
+
+			vertexProp, ok = typedProp[0].(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("Failed to cast vertex prop")
+			}
+		case map[string]interface{}:
+			vertexProp = typedProp
+		default:
+			return nil, fmt.Errorf("Failed to parse property, unknown type: %T!", rawProp)
 		}
 
 		vpValue, ok := vertexProp["@value"].(map[string]interface{})
@@ -259,15 +289,15 @@ func thingLoader(datum map[string]interface{}) (*store.Thing, error) {
 func (s *localStore) typeHierarchy(ctx context.Context, typID store.ID) ([]*store.Type, error) {
 	results, err := s.execute(ctx, Statements{
 		thingQuery(Graph().V().
-			HasLabel(typID.String()).
+			HasLabel(String(typID)).
 			As("a").
 			Union(
 				Select("a"),
 				Repeat(
-					OutE(store.SubtypeOfType.ID().String()).OtherV(),
+					OutE(String(store.SubtypeOfType.ID().String())).OtherV(),
 				).
 					Until(
-						InE(store.SubtypeOfType.ID().String()).Count().Is(0),
+						InE(String(store.SubtypeOfType.ID().String())).Count().Is(0),
 					).
 					Emit(),
 			)),
@@ -292,8 +322,22 @@ func (s *localStore) typeHierarchy(ctx context.Context, typID store.ID) ([]*stor
 	return typs, nil
 }
 
-func (s *localStore) Inherits(context.Context, *store.Type, *store.Type) (bool, error) {
-	return false, store.ErrUnimplemented
+func (s *localStore) Inherits(ctx context.Context, typ *store.Type, parent *store.Type) (bool, error) {
+	typeHierarchy, err := s.TypeHierarchy(ctx, typ)
+	if err != nil {
+		return false, err
+	}
+
+	isInheritted := false
+
+	for _, t := range typeHierarchy {
+		if t.Thing().Equal(parent) {
+			isInheritted = true
+			break
+		}
+	}
+
+	return isInheritted, nil
 }
 
 func (s *localStore) IsA(ctx context.Context, thingable store.Thingable, t *store.Type) (bool, error) {
@@ -321,8 +365,10 @@ func (s *localStore) Validate(ctx context.Context, t store.Thingable, opts store
 
 func (s *localStore) GetByID(ctx context.Context, idable store.IDable) (*store.Thing, error) {
 	results, err := s.execute(ctx, Statements{
-		thingQuery(Graph().V().
-			HasLabel(idable.ID().String())),
+		G.V().Coalesce(
+			thingQuery(HasLabel(String(idable.ID()))),
+			relationQuery(G.E().HasLabel(String(idable.ID()))),
+		),
 	})
 
 	if err != nil {
@@ -338,7 +384,11 @@ func (s *localStore) GetByID(ctx context.Context, idable store.IDable) (*store.T
 		return nil, fmt.Errorf("Failed to cast result")
 	}
 
-	return thingLoader(rawMap)
+	thing, err := thingLoader(rawMap)
+
+	fmt.Println(thing, err)
+
+	return thing, err
 }
 
 func (s *localStore) GetEntityByID(ctx context.Context, idable store.IDable) (*store.Entity, error) {
@@ -397,31 +447,41 @@ func (s *localStore) ListByType(ctx context.Context, typ *store.Type, options st
 		return []*store.Thing{}, store.ErrUnimplemented
 	}
 
-	query := Graph().V()
+	query := G.V().As("vertex").Union(Select("vertex"), G.E().HasNot(String("hidden")).As("edge"))
+
+	/*results, err := s.execute(ctx, Statements{
+		G.V().Coalesce(
+			thingQuery(HasLabel(String(idable.ID()))),
+			relationQuery(G.E().HasLabel(String(idable.ID()))),
+		),
+	})*/
 
 	if typ != nil {
 		typID := typ.ID()
-		query = Graph().V().
-			HasLabel(typID.String()).
+		typQuery := G.V().
+			HasLabel(String(typID)).
 			As("a").
 			Union(
 				Select("a"),
 				Repeat(
-					OutE(store.SubtypeOfType.ID().String()).OtherV(),
+					OutE(String(store.SubtypeOfType.ID().String())).OtherV(),
 				).
 					Until(
-						InE(store.SubtypeOfType.ID().String()).Count().Is(0),
+						InE(String(store.SubtypeOfType.ID().String())).Count().Is(0),
 					).
 					Emit(),
-			).
-			InE(store.TypeOfType.ID().String()).OtherV()
+			)
+		query = typQuery.As("types").
+			Union(
+				Select("types").InE(String(store.TypeOfType.ID())).OtherV().As("vertex"),
+				G.E().HasNot(String("hidden")).Has(String("type"), Within(typQuery.Label().ToList())).As("edge"),
+			)
 	}
 
 	results, err := s.execute(ctx, Statements{
-		thingQuery(
-			query.Order().By("label", order).
-				Range(options.Offset, options.Offset+options.NumberOfResults),
-		),
+		query.Order().By("label", order).
+			Range(options.Offset, options.Offset+options.NumberOfResults).
+			Union(thingQuery(Select("vertex")), relationQuery(Select("edge"))),
 	})
 
 	if err != nil {
@@ -488,8 +548,76 @@ func (s *localStore) ListTypes(ctx context.Context, options store.ListOptions) (
 	return types, nil
 }
 
-func (s *localStore) ListRelationsForEntity(context.Context, *store.Type, *store.Entity, store.ListOptions) ([]*store.Relation, error) {
-	return nil, store.ErrUnimplemented
+func (s *localStore) ListRelationsForEntity(ctx context.Context, relConstraint *store.Type, ent *store.Entity, options store.ListOptions) ([]*store.Relation, error) {
+
+	relType := store.RelationType
+
+	if relConstraint != nil {
+		if isRelation, err := s.Inherits(ctx, relConstraint, store.RelationType); err != nil {
+			return nil, err
+		} else if !isRelation {
+			return nil, fmt.Errorf("%v is not a relation", relConstraint)
+		}
+
+		relType = relConstraint
+	}
+
+	if options.NumberOfResults == 0 {
+		options.NumberOfResults = store.DefaultNumberOfResults
+	}
+
+	var order string
+
+	switch options.SortOrder {
+	case store.SortAscending:
+		order = "asc"
+	case store.SortDescending:
+		order = "desc"
+	default:
+		return nil, store.ErrUnimplemented
+	}
+
+	relationTraversal := Graph().V().
+		HasLabel(String(relType.ID())).
+		As("a").
+		Union(
+			Select("a"),
+			Repeat(
+				InE(String(store.SubtypeOfType.ID())).OtherV(),
+			).
+				Until(
+					OutE(String(store.SubtypeOfType.ID())).Count().Is(0),
+				).
+				Emit(),
+		).Label().ToList()
+
+	query := Graph().V().
+		HasLabel(String(ent.ID())).OutE().Has(Keyword("id"), relationTraversal)
+
+	results, err := s.execute(ctx, Statements{
+		thingQuery(
+			query.Order().By("label", order).
+				Range(options.Offset, options.Offset+options.NumberOfResults),
+		),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	relations := make([]*store.Relation, len(results))
+
+	for idx, rawEntry := range results {
+		rawMap := rawEntry.(map[string]interface{})
+		thing, err := thingLoader(rawMap)
+		if err != nil {
+			return nil, err
+		}
+
+		relations[idx] = (*store.Relation)(thing)
+	}
+
+	return relations, nil
 }
 
 func (s *localStore) WatchByID(context.Context, store.IDable) (chan *store.Thing, error) {

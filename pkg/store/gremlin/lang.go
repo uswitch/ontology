@@ -49,6 +49,53 @@ type Statement struct {
 	parts []string
 }
 
+func funcCall(name string, args []Statement) string {
+	argStrings := make([]string, len(args))
+	for idx, arg := range args {
+		argStrings[idx] = arg.String()
+	}
+
+	return fmt.Sprintf("%s(%s)", name, strings.Join(argStrings, ", "))
+}
+
+func Keyword(raw interface{}) Statement {
+	var part string
+	switch s := raw.(type) {
+	case string:
+		part = s
+	case []byte:
+		part = string(s)
+	case fmt.Stringer:
+		part = s.String()
+	default:
+		panic(fmt.Sprintf("keyword unknown type: %T!", raw))
+	}
+
+	return Statement{
+		parts: []string{part},
+	}
+}
+
+func String(raw interface{}) Statement {
+	var part string
+	switch s := raw.(type) {
+	case string:
+		part = s
+	case []byte:
+		part = string(s)
+	case fmt.Stringer:
+		part = s.String()
+	default:
+		panic(fmt.Sprintf("string unknown type: %T!", raw))
+	}
+
+	return Statement{
+		parts: []string{fmt.Sprintf("'%s'", part)},
+	}
+}
+
+var G = Keyword("g")
+
 func Graph() Statement {
 	return Statement{
 		parts: []string{"graph.traversal()"},
@@ -66,19 +113,19 @@ func BothE(label string) Statement {
 		parts: []string{fmt.Sprintf("bothE('%s')", label)},
 	}
 }
-func InE(label string) Statement {
+func InE(label Statement) Statement {
 	return Statement{
-		parts: []string{fmt.Sprintf("inE('%s')", label)},
+		parts: []string{fmt.Sprintf("inE(%s)", label.String())},
 	}
 }
-func (s Statement) InE(label string) Statement {
+func (s Statement) InE(label Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("inE('%s')", label)),
+		parts: append(s.parts, fmt.Sprintf("inE(%s)", label.String())),
 	}
 }
-func OutE(label string) Statement {
+func OutE(ss ...Statement) Statement {
 	return Statement{
-		parts: []string{fmt.Sprintf("outE('%s')", label)},
+		parts: []string{funcCall("outE", ss)},
 	}
 }
 func Select(vals ...string) Statement {
@@ -104,6 +151,12 @@ func (s Statement) Select(vals ...string) Statement {
 	}
 }
 
+func Within(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("within", ss)},
+	}
+}
+
 func Repeat(other Statement) Statement {
 	return Statement{
 		parts: []string{fmt.Sprintf("repeat(%s)", other.String())},
@@ -126,9 +179,9 @@ func (s Statement) V1(inner string) Statement {
 	}
 }
 
-func (s Statement) E() Statement {
+func (s Statement) E(ss ...Statement) Statement {
 	return Statement{
-		parts: append(s.parts, "E()"),
+		parts: append(s.parts, funcCall("E", ss)),
 	}
 }
 
@@ -156,15 +209,21 @@ func (s Statement) Count() Statement {
 	}
 }
 
-func (s Statement) OutE(id string) Statement {
+func (s Statement) OutE(ss ...Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("outE('%s')", id)),
+		parts: append(s.parts, funcCall("outE", ss)),
 	}
 }
 
 func (s Statement) InV() Statement {
 	return Statement{
 		parts: append(s.parts, "inV()"),
+	}
+}
+
+func (s Statement) Label() Statement {
+	return Statement{
+		parts: append(s.parts, "label()"),
 	}
 }
 
@@ -214,31 +273,31 @@ func (s Statement) Range(k, v uint) Statement {
 		parts: append(s.parts, fmt.Sprintf("range(%d, %d)", k, v)),
 	}
 }
-func (s Statement) Has(k, v string) Statement {
+func (s Statement) Has(ss ...Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("has('%s', '%s')", k, v)),
+		parts: append(s.parts, funcCall("has", ss)),
 	}
 }
-func (s Statement) Property(k, v string) Statement {
+func (s Statement) Property(ss ...Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("property('%s', '%s')", k, v)),
+		parts: append(s.parts, funcCall("property", ss)),
 	}
 }
-func (s Statement) Values(k string) Statement {
+func (s Statement) Values(ss ...Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("values('%s')", k)),
-	}
-}
-
-func (s Statement) AddV(label string) Statement {
-	return Statement{
-		parts: append(s.parts, fmt.Sprintf("addV('%s')", label)),
+		parts: append(s.parts, funcCall("values", ss)),
 	}
 }
 
-func (s Statement) AddE(label string) Statement {
+func (s Statement) AddV(ss ...Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("addE('%s')", label)),
+		parts: append(s.parts, funcCall("addV", ss)),
+	}
+}
+
+func (s Statement) AddE(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("addE", ss)),
 	}
 }
 
@@ -254,15 +313,21 @@ func (s Statement) As(label string) Statement {
 	}
 }
 
-func (s Statement) HasLabel(label string) Statement {
+func (s Statement) HasLabel(ss ...Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("hasLabel('%s')", label)),
+		parts: append(s.parts, funcCall("hasLabel", ss)),
 	}
 }
 
-func (s Statement) From(label string) Statement {
+func (s Statement) HasNot(ss ...Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("from('%s')", label)),
+		parts: append(s.parts, funcCall("hasNot", ss)),
+	}
+}
+
+func (s Statement) From(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("from", ss)),
 	}
 }
 
@@ -323,5 +388,41 @@ func (s Statement) Union(ss ...Statement) Statement {
 
 	return Statement{
 		parts: append(s.parts, fmt.Sprintf("union(%s)", strings.Join(strs, ", "))),
+	}
+}
+
+func (s Statement) ToList(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("toList", ss)),
+	}
+}
+
+func (s Statement) Coalesce(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("coalesce", ss)),
+	}
+}
+
+func (s Statement) Barrier(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("barrier", ss)),
+	}
+}
+
+func (s Statement) TryNext(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("tryNext", ss)),
+	}
+}
+
+func HasLabel(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("hasLabel", ss)},
+	}
+}
+
+func E(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("E", ss)},
 	}
 }

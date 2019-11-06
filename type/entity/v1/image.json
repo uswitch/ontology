@@ -1,6 +1,7 @@
 {
     "metadata": {
-        "type": "/type"
+        "type": "/type",
+        "name": "Container"
     },
     "properties": {
         "parent": "/entity/v1/workload",

@@ -1,6 +1,7 @@
 {
     "metadata": {
-        "type": "/type"
+        "type": "/type",
+        "name": "Service"
     },
     "properties": {
         "parent": "/entity/v1",

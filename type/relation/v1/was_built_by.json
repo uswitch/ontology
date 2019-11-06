@@ -1,28 +1,26 @@
 {
     "metadata": {
-        "type": "/type"
+        "type": "/type",
+        "name": "Was built by"
     },
     "properties": {
         "parent": "/relation/v1",
         "template": "{{{ a }}} was built by {{{ b }}}@{{ ref }} at {{ at }}",
+        "required": ["a", "b", "ref", "at"],
         "spec": {
             "a": {
                 "type": "string",
-                "pointer_to": "/entity/v1/image",
-                "required": true
+                "pointer_to": "/entity/v1/image"
             },
             "b": {
                 "type": "string",
-                "pointer_to": "/entity/v1/repository",
-                "required": true
+                "pointer_to": "/entity/v1/repository"
             },
             "ref": {
-                "type": ["string", "null"],
-                "required": true
+                "type": ["string", "null"]
             },
             "at": {
-                "type": "",
-                "required": true
+                "type": ""
             }
         }
     }

@@ -1,6 +1,7 @@
 {
     "metadata": {
-        "type": "/type"
+        "type": "/type",
+        "name": "Is part of"
     },
     "properties": {
         "parent": "/relation/v1",

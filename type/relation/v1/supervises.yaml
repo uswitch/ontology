@@ -1,14 +1,14 @@
 metadata:
   type: /type
+  name: Supervises
 properties:
   parent: /relation/v1
   template: "{{{ a }}} supervises {{{ b }}}"
+  required: ["a", "b"]
   spec:
     a:
       type: string
       pointer_to: /entity/v1/workload
-      required: true
     b:
       type: string
       pointer_to: /entity/v1/workload
-      required: true

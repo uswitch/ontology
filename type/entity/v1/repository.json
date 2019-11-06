@@ -1,9 +1,18 @@
 {
     "metadata": {
-        "type": "/type"
+        "type": "/type",
+        "name": "Repository"
     },
     "properties": {
         "parent": "/entity/v1",
-        "spec": {}
+        "spec": {
+            "server": { "type": "string" },
+            "path": { "type": "string" },
+            "archived": { "type": "boolean" },
+            "disabled": { "type": "boolean" },
+            "created_at": { "type": "string" },
+            "updated_at": { "type": "string" },
+            "pushed_at": { "type": "string" }
+        }
     }
 }

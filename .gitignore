@@ -1,2 +1,4 @@
 /external/
 /tmp/
+/bin/http-api
+/config.json

@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/uswitch/ontology/pkg/store/gremlin"
+
 	"github.com/uswitch/ontology/pkg/types"
 	_ "github.com/uswitch/ontology/pkg/types/entity"
 	_ "github.com/uswitch/ontology/pkg/types/entity/v1"
@@ -13,13 +15,21 @@ import (
 )
 
 func main() {
+	store, err := gremlin.NewLocalServer("ws://127.0.0.1:8182")
+	if err != nil {
+		log.Fatalf("failed to connect to store: %v", err)
+	}
+
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		_, err := types.Parse(scanner.Text())
+		in, err := types.Parse(scanner.Text())
 		if err != nil {
 			log.Printf("error parsing: %v", err)
 		}
 
+		if err = store.Add(in); err != nil {
+			log.Printf("error adding: %v", err)
+		}
 		//log.Printf("%T %+v", out, out)
 	}
 	if err := scanner.Err(); err != nil {

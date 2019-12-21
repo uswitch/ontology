@@ -7,16 +7,9 @@ import (
 	"time"
 )
 
-// type basics
-
 type ID string
 
-type IDable interface {
-	ID() ID
-}
-
 func (id ID) String() string { return string(id) }
-func (id ID) ID() ID         { return id }
 
 type Metadata struct {
 	ID        ID        `json:"id"`
@@ -50,7 +43,27 @@ func RegisterType(instance interface{}, id string, parent string) {
 	}
 }
 
-func Parse(raw string) (interface{}, error) {
+type Instance interface {
+	ID() ID
+	Type() ID
+}
+
+type Any struct {
+	Metadata   `json:"metadata"`
+	Properties struct{} `json:"properties"`
+}
+
+func (i *Any) ID() ID {
+	return i.Metadata.ID
+}
+
+func (i *Any) Type() ID {
+	return i.Metadata.Type
+}
+
+func init() { RegisterType(Any{}, "/any", "") }
+
+func Parse(raw string) (Instance, error) {
 	var any meta
 
 	if err := json.Unmarshal([]byte(raw), &any); err != nil {
@@ -68,13 +81,12 @@ func Parse(raw string) (interface{}, error) {
 			return nil, err
 		}
 
-		return val, nil
+		inst, ok := val.(Instance)
+
+		if !ok {
+			return nil, fmt.Errorf("type was not an instance: %T", val)
+		}
+
+		return inst, nil
 	}
 }
-
-type Any struct {
-	Metadata   `json:"metadata"`
-	Properties struct{} `json:"properties"`
-}
-
-func init() { RegisterType(Any{}, "/any", "") }

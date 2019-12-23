@@ -66,26 +66,36 @@ func (l *local) execute(ctx context.Context, statement Statement) ([]interface{}
 }
 
 func (l *local) Add(ctx context.Context, instances ...types.Instance) error {
+	st := Var("g")
 
-	for _, instance := range instances {
-		st := Var("g")
-
+	for i, instance := range instances {
 		serialized, err := json.Marshal(instance)
 		if err != nil {
 			return err
 		}
 
 		if types.IsA(instance, entity.ID) {
-			log.Printf("is an entity: %s", instance.ID())
-
-			st = st.AddV(String(instance.ID()))
+			st = st.V().Has(String("entity"), String("id"), String(instance.ID())).Fold().
+				Coalesce(
+					Unfold(),
+					AddV(String("entity")),
+				)
 		} else if types.IsA(instance, relation.ID) {
 			if instance, ok := instance.(relation.Instance); ok {
-				log.Printf("is a relation: %s [%s -> %s]", instance.ID(), instance.A(), instance.B())
-
-				st = st.AddE(String(instance.ID())).
-					From(Keyword("g").V().HasLabel(String(instance.A()))).
-					To(Keyword("g").V().HasLabel(String(instance.B())))
+				st = st.V().Has(String("entity"), String("id"), String(instance.A())).Fold().
+					Coalesce(
+						Unfold(),
+						AddV(String("entity")).Property(String("id"), String(instance.A())),
+					).As("start").
+					Map(V().Has(String("entity"), String("id"), String(instance.B())).Fold()).
+					Coalesce(
+						Unfold(),
+						AddV(String("entity")).Property(String("id"), String(instance.B())),
+					).
+					Coalesce(
+						InE(String(instance.ID())).Where(OutV().As("start")),
+						AddE(String(instance.ID())).From(String("start")),
+					)
 			} else {
 				log.Printf("instance doesn't conform to relation.Instance: %T", instance)
 			}
@@ -94,20 +104,25 @@ func (l *local) Add(ctx context.Context, instances ...types.Instance) error {
 			log.Printf("a rather strange type of instance: %s", instance.Type())
 		}
 
-		st = st.Property(String("type"), String(instance.Type())).
+		st = st.Property(String("id"), String(instance.ID())).
+			Property(String("type"), String(instance.Type())).
 			Property(String("_serialized"), String(serialized))
 
 		// we can only execute so many at a time. frame size is 65536.
-		/*if i%1 == 0 {
-			if _, err := l.execute(ctx, Statements{st}); err != nil {
+		if i%30 == 0 {
+			if _, err := l.execute(ctx, st); err != nil {
 				return err
 			} else {
 				st = Var("g")
 			}
-		}*/
-		if _, err := l.execute(ctx, st); err != nil {
-			return err
 		}
+		/*if _, err := l.execute(ctx, st); err != nil {
+			return err
+		}*/
+	}
+
+	if _, err := l.execute(ctx, st); err != nil {
+		return err
 	}
 
 	return nil
@@ -193,8 +208,8 @@ func (l *local) Get(ctx context.Context, id types.ID) (types.Instance, error) {
 	return l.getByStatement(
 		ctx,
 		G.V().Coalesce(
-			HasLabel(String(id)),
-			G.E().HasLabel(String(id)),
+			Has(String("id"), String(id)),
+			G.E().Has(String("id"), String(id)),
 		),
 	)
 }
@@ -238,4 +253,28 @@ func (l *local) ListByType(ctx context.Context, id types.ID) ([]types.Instance, 
 	}
 
 	return nil, fmt.Errorf("type '%s' isn't an entity or relation", id)
+}
+
+func (l *local) ListFromByType(ctx context.Context, rootID types.ID, typeID types.ID) ([]types.Instance, error) {
+	subclasses := types.SubclassesOf(typeID)
+	classStatements := make([]Statement, len(subclasses)+1)
+
+	classStatements[0] = String(typeID)
+
+	for idx, subclass := range subclasses {
+		classStatements[idx+1] = String(subclass)
+	}
+
+	if types.InheritsFrom(typeID, entity.ID) {
+		return l.listByStatement(
+			ctx,
+			G.V().Has(String("id"), String(rootID)).
+				Repeat(Out()).Times(Int(2)).Emit().Dedup().
+				Has(String("type"), Within(classStatements...)),
+		)
+	} else if types.InheritsFrom(typeID, relation.ID) {
+		return nil, nil
+	}
+
+	return nil, fmt.Errorf("type '%s' isn't an entity or relation", typeID)
 }

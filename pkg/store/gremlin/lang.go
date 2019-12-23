@@ -337,9 +337,15 @@ func (s Statement) From(ss ...Statement) Statement {
 	}
 }
 
-func (s Statement) Times(num int) Statement {
+func (s Statement) Times(ss ...Statement) Statement {
 	return Statement{
-		parts: append(s.parts, fmt.Sprintf("times(%d)", num)),
+		parts: append(s.parts, funcCall("times", ss)),
+	}
+}
+
+func (s Statement) Dedup(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("dedup", ss)),
 	}
 }
 
@@ -427,6 +433,24 @@ func (s Statement) Inject(ss ...Statement) Statement {
 	}
 }
 
+func (s Statement) Fold(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("fold", ss)),
+	}
+}
+
+func (s Statement) Map(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("map", ss)),
+	}
+}
+
+func (s Statement) Where(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("where", ss)),
+	}
+}
+
 func HasLabel(ss ...Statement) Statement {
 	return Statement{
 		parts: []string{funcCall("hasLabel", ss)},
@@ -453,5 +477,41 @@ func Identity(ss ...Statement) Statement {
 func Range(ss ...Statement) Statement {
 	return Statement{
 		parts: []string{funcCall("range", ss)},
+	}
+}
+
+func Out(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("out", ss)},
+	}
+}
+
+func Unfold(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("unfold", ss)},
+	}
+}
+
+func AddV(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("addV", ss)},
+	}
+}
+
+func AddE(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("addE", ss)},
+	}
+}
+
+func OutV(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("outV", ss)},
+	}
+}
+
+func V(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("V", ss)},
 	}
 }

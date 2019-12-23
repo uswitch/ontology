@@ -15,6 +15,7 @@ func Conformance(t *testing.T, newStore func() store.Store) {
 		"AddAndGet":      TestAddAndGet,
 		"List":           TestList,
 		"ListSubclasses": TestListSubclasses,
+		"ListFromByType": TestListFromByType,
 	}
 
 	for name, test := range tests {
@@ -101,11 +102,15 @@ type Apple struct{ entity.Entity }
 type Orange struct{ entity.Entity }
 type Horse struct{ entity.Entity }
 
+type LikesToEat struct{ relation.Relation }
+
 func init() {
 	types.RegisterType(Fruit{}, types.ID("/fruit"), entity.ID)
 	types.RegisterType(Apple{}, types.ID("/fruit/apple"), types.ID("/fruit"))
 	types.RegisterType(Orange{}, types.ID("/fruit/orange"), types.ID("/fruit"))
 	types.RegisterType(Horse{}, types.ID("/horse"), entity.ID)
+
+	types.RegisterType(LikesToEat{}, "/relation/likes-to-eat", relation.ID)
 }
 
 func TestListSubclasses(t *testing.T, s store.Store) {
@@ -129,6 +134,35 @@ func TestListSubclasses(t *testing.T, s store.Store) {
 	} else if list == nil {
 		t.Errorf("no entity list returned")
 	} else if expected := 2; len(list) != expected {
+		t.Errorf("entity list is the wrong size: %d != %d", len(list), expected)
+	}
+
+}
+
+func TestListFromByType(t *testing.T, s store.Store) {
+	if err := s.Add(
+		context.Background(),
+		&entity.Entity{
+			types.Any{Metadata: types.Metadata{ID: "/horses/black-beauty", Type: "/horse"}},
+		},
+		&entity.Entity{
+			types.Any{Metadata: types.Metadata{ID: "/apples/braeburn", Type: "/fruit/apple"}},
+		},
+		&LikesToEat{
+			relation.Relation{
+				types.Any{Metadata: types.Metadata{ID: "/l8hreliueanbr", Type: "/relation/likes-to-eat"}},
+				relation.Properties{A: "/horses/black-beauty", B: "/apples/braeburn"},
+			},
+		},
+	); err != nil {
+		t.Fatalf("failed to add entity: %v", err)
+	}
+
+	if list, err := s.ListFromByType(context.Background(), "/horses/black-beauty", "/fruit"); err != nil {
+		t.Errorf("failed to list entities: %v", err)
+	} else if list == nil {
+		t.Errorf("no entity list returned")
+	} else if expected := 1; len(list) != expected {
 		t.Errorf("entity list is the wrong size: %d != %d", len(list), expected)
 	}
 

@@ -10,4 +10,4 @@ type Entity struct {
 	types.Any
 }
 
-func init() { types.RegisterType(Entity{}, ID.String(), "") }
+func init() { types.RegisterType(Entity{}, ID, types.EmptyID) }

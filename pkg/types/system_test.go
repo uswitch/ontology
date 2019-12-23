@@ -41,6 +41,7 @@ func TestParse(t *testing.T) {
 type Person struct{ Any }
 type Computer struct{ Any }
 type Laptop struct{ Any }
+type MacBook struct{ Any }
 
 func TestIsA(t *testing.T) {
 	system := NewSystem()
@@ -79,5 +80,39 @@ func TestInheritsFrom(t *testing.T) {
 	}
 	if !system.InheritsFrom("/laptop", "/computer") {
 		t.Errorf("laptop should be a type of computer")
+	}
+}
+
+func TestSubclassesOf(t *testing.T) {
+	system := NewSystem()
+
+	system.RegisterType(Person{}, "/person", "")
+	system.RegisterType(Computer{}, "/computer", "")
+	system.RegisterType(Laptop{}, "/laptop", "/computer")
+	system.RegisterType(MacBook{}, "/laptop/macbook", "/laptop")
+
+	expectedSubclasses := []ID{
+		ID("/laptop"),
+		ID("/laptop/macbook"),
+	}
+
+	actualSubclasses := system.SubclassesOf("/computer")
+
+	if len(expectedSubclasses) != len(actualSubclasses) {
+		t.Errorf("different lengths: %d != %d", len(expectedSubclasses), len(actualSubclasses))
+	}
+
+	for _, expectedSubclass := range expectedSubclasses {
+		found := false
+		for _, actualSubclass := range actualSubclasses {
+			if actualSubclass == expectedSubclass {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("didn't find %s in %v", expectedSubclass, actualSubclasses)
+		}
 	}
 }

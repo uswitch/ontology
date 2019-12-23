@@ -222,10 +222,19 @@ func (l *local) listByStatement(ctx context.Context, st Statement) ([]types.Inst
 }
 
 func (l *local) ListByType(ctx context.Context, id types.ID) ([]types.Instance, error) {
+	subclasses := types.SubclassesOf(id)
+	classStatements := make([]Statement, len(subclasses)+1)
+
+	classStatements[0] = String(id)
+
+	for idx, subclass := range subclasses {
+		classStatements[idx+1] = String(subclass)
+	}
+
 	if types.InheritsFrom(id, entity.ID) {
-		return l.listByStatement(ctx, G.V().Has(String("type"), String(id)))
+		return l.listByStatement(ctx, G.V().Has(String("type"), Within(classStatements...)))
 	} else if types.InheritsFrom(id, relation.ID) {
-		return l.listByStatement(ctx, G.E().Has(String("type"), String(id)))
+		return l.listByStatement(ctx, G.E().Has(String("type"), Within(classStatements...)))
 	}
 
 	return nil, fmt.Errorf("type '%s' isn't an entity or relation", id)

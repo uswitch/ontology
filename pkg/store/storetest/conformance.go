@@ -12,8 +12,9 @@ import (
 
 func Conformance(t *testing.T, newStore func() store.Store) {
 	tests := map[string]func(*testing.T, store.Store){
-		"AddAndGet": TestAddAndGet,
-		"List":      TestList,
+		"AddAndGet":      TestAddAndGet,
+		"List":           TestList,
+		"ListSubclasses": TestListSubclasses,
 	}
 
 	for name, test := range tests {
@@ -93,4 +94,42 @@ func TestList(t *testing.T, s store.Store) {
 	} else if expected := 1; len(list) != expected {
 		t.Errorf("relation list is the wrong size: %d != %d", len(list), expected)
 	}
+}
+
+type Fruit struct{ entity.Entity }
+type Apple struct{ entity.Entity }
+type Orange struct{ entity.Entity }
+type Horse struct{ entity.Entity }
+
+func init() {
+	types.RegisterType(Fruit{}, types.ID("/fruit"), entity.ID)
+	types.RegisterType(Apple{}, types.ID("/fruit/apple"), types.ID("/fruit"))
+	types.RegisterType(Orange{}, types.ID("/fruit/orange"), types.ID("/fruit"))
+	types.RegisterType(Horse{}, types.ID("/horse"), entity.ID)
+}
+
+func TestListSubclasses(t *testing.T, s store.Store) {
+	if err := s.Add(
+		context.Background(),
+		&entity.Entity{
+			types.Any{Metadata: types.Metadata{ID: "/horses/black-beauty", Type: "/horse"}},
+		},
+		&entity.Entity{
+			types.Any{Metadata: types.Metadata{ID: "/apples/braeburn", Type: "/fruit/apple"}},
+		},
+		&entity.Entity{
+			types.Any{Metadata: types.Metadata{ID: "/oranges/seville", Type: "/fruit/orange"}},
+		},
+	); err != nil {
+		t.Fatalf("failed to add entity: %v", err)
+	}
+
+	if list, err := s.ListByType(context.Background(), "/fruit"); err != nil {
+		t.Errorf("failed to list entities: %v", err)
+	} else if list == nil {
+		t.Errorf("no entity list returned")
+	} else if expected := 2; len(list) != expected {
+		t.Errorf("entity list is the wrong size: %d != %d", len(list), expected)
+	}
+
 }

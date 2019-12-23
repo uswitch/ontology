@@ -11,6 +11,8 @@ type ID string
 
 func (id ID) String() string { return string(id) }
 
+const EmptyID = ID("")
+
 type Metadata struct {
 	ID        ID        `json:"id"`
 	Type      ID        `json:"type"`
@@ -36,22 +38,22 @@ func (i *Any) Name() string         { return i.Metadata.Name }
 func (i *Any) UpdatedAt() time.Time { return i.Metadata.UpdatedAt }
 
 type System struct {
-	types    map[string]reflect.Type
-	typeIDs  map[reflect.Type]string
-	parent   map[string]string
-	children map[string][]string
+	types    map[ID]reflect.Type
+	typeIDs  map[reflect.Type]ID
+	parent   map[ID]ID
+	children map[ID][]ID
 }
 
 func NewSystem() *System {
 	return &System{
-		types:    map[string]reflect.Type{},
-		typeIDs:  map[reflect.Type]string{},
-		parent:   map[string]string{},
-		children: map[string][]string{},
+		types:    map[ID]reflect.Type{},
+		typeIDs:  map[reflect.Type]ID{},
+		parent:   map[ID]ID{},
+		children: map[ID][]ID{},
 	}
 }
 
-func (s *System) RegisterType(instance interface{}, id string, parentID string) {
+func (s *System) RegisterType(instance interface{}, id ID, parentID ID) {
 	typ := reflect.TypeOf(instance)
 	s.types[id] = typ
 	s.typeIDs[typ] = id
@@ -59,7 +61,7 @@ func (s *System) RegisterType(instance interface{}, id string, parentID string) 
 	if parentID != "" {
 		s.parent[id] = parentID
 		if _, ok := s.children[parentID]; !ok {
-			s.children[parentID] = []string{}
+			s.children[parentID] = []ID{}
 		}
 		s.children[parentID] = append(s.children[parentID], id)
 	}
@@ -74,7 +76,7 @@ func (s *System) Parse(raw string) (Instance, error) {
 		return nil, err
 	}
 
-	typeID := any.Metadata.Type.String()
+	typeID := any.Metadata.Type
 
 	if typ, ok := s.types[typeID]; !ok {
 		return nil, fmt.Errorf("unknown type: %s", typeID)
@@ -96,10 +98,8 @@ func (s *System) Parse(raw string) (Instance, error) {
 }
 
 func (s *System) InheritsFrom(id ID, super ID) bool {
-	superString := super.String()
-
-	for typeID := id.String(); typeID != ""; typeID = s.parent[typeID] {
-		if typeID == superString {
+	for typeID := id; typeID != ""; typeID = s.parent[typeID] {
+		if typeID == super {
 			return true
 		}
 	}
@@ -108,9 +108,9 @@ func (s *System) InheritsFrom(id ID, super ID) bool {
 }
 
 func (s *System) IsA(inst Instance, id ID) bool {
-	firstTypeID := inst.Type().String()
+	firstTypeID := inst.Type()
 
-	if firstTypeID == "" {
+	if firstTypeID == EmptyID {
 		instType := reflect.TypeOf(inst)
 		if instType.Kind() == reflect.Ptr {
 			instType = instType.Elem()
@@ -121,9 +121,22 @@ func (s *System) IsA(inst Instance, id ID) bool {
 	return s.InheritsFrom(ID(firstTypeID), id)
 }
 
+func (s *System) SubclassesOf(id ID) []ID {
+	directChildren := s.children[id]
+
+	out := make([]ID, len(directChildren))
+	copy(out, directChildren)
+
+	for _, directChild := range directChildren {
+		out = append(out, s.SubclassesOf(directChild)...)
+	}
+
+	return out
+}
+
 var system = NewSystem()
 
-func RegisterType(instance interface{}, id string, parentID string) {
+func RegisterType(instance interface{}, id ID, parentID ID) {
 	system.RegisterType(instance, id, parentID)
 }
 
@@ -137,4 +150,8 @@ func InheritsFrom(id ID, super ID) bool {
 
 func IsA(inst Instance, id ID) bool {
 	return system.IsA(inst, id)
+}
+
+func SubclassesOf(id ID) []ID {
+	return system.SubclassesOf(id)
 }

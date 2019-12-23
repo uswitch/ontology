@@ -94,6 +94,12 @@ func String(raw interface{}) Statement {
 	}
 }
 
+func Int(n int) Statement {
+	return Statement{
+		parts: []string{fmt.Sprintf("%d", n)},
+	}
+}
+
 var G = Keyword("g")
 
 func Graph() Statement {
@@ -415,14 +421,37 @@ func (s Statement) TryNext(ss ...Statement) Statement {
 	}
 }
 
+func (s Statement) Inject(ss ...Statement) Statement {
+	return Statement{
+		parts: append(s.parts, funcCall("inject", ss)),
+	}
+}
+
 func HasLabel(ss ...Statement) Statement {
 	return Statement{
 		parts: []string{funcCall("hasLabel", ss)},
+	}
+}
+func Has(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("has", ss)},
 	}
 }
 
 func E(ss ...Statement) Statement {
 	return Statement{
 		parts: []string{funcCall("E", ss)},
+	}
+}
+
+func Identity(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("identity", ss)},
+	}
+}
+
+func Range(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("range", ss)},
 	}
 }

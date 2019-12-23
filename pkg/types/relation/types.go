@@ -25,4 +25,4 @@ type Relation struct {
 func (r *Relation) A() types.ID { return r.Properties.A }
 func (r *Relation) B() types.ID { return r.Properties.B }
 
-func init() { types.RegisterType(Relation{}, ID.String(), "/any") }
+func init() { types.RegisterType(Relation{}, ID.String(), "") }

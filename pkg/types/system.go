@@ -35,8 +35,6 @@ func (i *Any) Type() ID             { return i.Metadata.Type }
 func (i *Any) Name() string         { return i.Metadata.Name }
 func (i *Any) UpdatedAt() time.Time { return i.Metadata.UpdatedAt }
 
-func init() { RegisterType(Any{}, "/any", "") }
-
 type System struct {
 	types    map[string]reflect.Type
 	typeIDs  map[reflect.Type]string
@@ -97,9 +95,19 @@ func (s *System) Parse(raw string) (Instance, error) {
 	}
 }
 
-func (s *System) IsA(inst Instance, id ID) bool {
-	idString := id.String()
+func (s *System) InheritsFrom(id ID, super ID) bool {
+	superString := super.String()
 
+	for typeID := id.String(); typeID != ""; typeID = s.parent[typeID] {
+		if typeID == superString {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *System) IsA(inst Instance, id ID) bool {
 	firstTypeID := inst.Type().String()
 
 	if firstTypeID == "" {
@@ -110,13 +118,7 @@ func (s *System) IsA(inst Instance, id ID) bool {
 		firstTypeID = s.typeIDs[instType]
 	}
 
-	for typeID := firstTypeID; typeID != ""; typeID = s.parent[typeID] {
-		if typeID == idString {
-			return true
-		}
-	}
-
-	return false
+	return s.InheritsFrom(ID(firstTypeID), id)
 }
 
 var system = NewSystem()
@@ -127,6 +129,10 @@ func RegisterType(instance interface{}, id string, parentID string) {
 
 func Parse(raw string) (Instance, error) {
 	return system.Parse(raw)
+}
+
+func InheritsFrom(id ID, super ID) bool {
+	return system.InheritsFrom(id, super)
 }
 
 func IsA(inst Instance, id ID) bool {

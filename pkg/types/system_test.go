@@ -15,7 +15,7 @@ func TestParse(t *testing.T) {
 		} `json:"properties"`
 	}{}
 
-	system.RegisterType(thing, "/test", "/any")
+	system.RegisterType(thing, "/test", "")
 
 	parsedThing, err := system.Parse(`
 {
@@ -38,13 +38,15 @@ func TestParse(t *testing.T) {
 	}
 }
 
+type Person struct{ Any }
 type Computer struct{ Any }
 type Laptop struct{ Any }
 
 func TestIsA(t *testing.T) {
 	system := NewSystem()
 
-	system.RegisterType(Computer{}, "/computer", "/any")
+	system.RegisterType(Person{}, "/person", "")
+	system.RegisterType(Computer{}, "/computer", "")
 	system.RegisterType(Laptop{}, "/laptop", "/computer")
 
 	if !system.IsA(&Computer{Any{Metadata: Metadata{Type: "/computer"}}}, "/computer") {
@@ -58,6 +60,24 @@ func TestIsA(t *testing.T) {
 		t.Errorf("computer should be a type of computer")
 	}
 	if !system.IsA(&Laptop{}, "/computer") {
+		t.Errorf("laptop should be a type of computer")
+	}
+}
+
+func TestInheritsFrom(t *testing.T) {
+	system := NewSystem()
+
+	system.RegisterType(Person{}, "/person", "")
+	system.RegisterType(Computer{}, "/computer", "")
+	system.RegisterType(Laptop{}, "/laptop", "/computer")
+
+	if !system.InheritsFrom("/computer", "/computer") {
+		t.Errorf("computer should be a type of computer")
+	}
+	if system.InheritsFrom("/person", "/computer") {
+		t.Errorf("person should not be a type of computer")
+	}
+	if !system.InheritsFrom("/laptop", "/computer") {
 		t.Errorf("laptop should be a type of computer")
 	}
 }

@@ -38,8 +38,8 @@ func NewLocalServer(url string) (store.Store, error) {
 	}, err
 }
 
-func (l *local) execute(ctx context.Context, statement Statements) ([]interface{}, error) {
-	//log.Println(statement.String())
+func (l *local) execute(ctx context.Context, statement Statement) ([]interface{}, error) {
+	log.Println(statement.String())
 
 	out, err := l.client.Execute(statement.String(), nil, nil)
 	//pretty.Println(out, err)
@@ -94,9 +94,7 @@ func (l *local) Add(ctx context.Context, instances ...types.Instance) error {
 			log.Printf("a rather strange type of instance: %s", instance.Type())
 		}
 
-		st = st.Property(String("name"), String(instance.Name())).
-			Property(String("type"), String(instance.Type())).
-			Property(String("updated_at"), String(instance.UpdatedAt().Format(DATE_LAYOUT))).
+		st = st.Property(String("type"), String(instance.Type())).
 			Property(String("_serialized"), String(serialized))
 
 		// we can only execute so many at a time. frame size is 65536.
@@ -107,7 +105,7 @@ func (l *local) Add(ctx context.Context, instances ...types.Instance) error {
 				st = Var("g")
 			}
 		}*/
-		if _, err := l.execute(ctx, Statements{st}); err != nil {
+		if _, err := l.execute(ctx, st); err != nil {
 			return err
 		}
 	}
@@ -167,18 +165,13 @@ func loader(v map[string]interface{}) (types.Instance, error) {
 		return nil, fmt.Errorf("failed to cast _serialized: %v", props["_serialized"])
 	}
 
-	log.Println(serialized)
+	//log.Println(serialized)
 
 	return types.Parse(serialized)
 }
 
-func (l *local) Get(ctx context.Context, id types.ID) (types.Instance, error) {
-	results, err := l.execute(ctx, Statements{
-		G.V().Coalesce(
-			HasLabel(String(id)),
-			G.E().HasLabel(String(id)),
-		),
-	})
+func (l *local) getByStatement(ctx context.Context, st Statement) (types.Instance, error) {
+	results, err := l.execute(ctx, st)
 
 	if err != nil {
 		return nil, err
@@ -196,6 +189,44 @@ func (l *local) Get(ctx context.Context, id types.ID) (types.Instance, error) {
 	return loader(rawMap)
 }
 
+func (l *local) Get(ctx context.Context, id types.ID) (types.Instance, error) {
+	return l.getByStatement(
+		ctx,
+		G.V().Coalesce(
+			HasLabel(String(id)),
+			G.E().HasLabel(String(id)),
+		),
+	)
+}
+
+func (l *local) listByStatement(ctx context.Context, st Statement) ([]types.Instance, error) {
+	results, err := l.execute(ctx, st)
+
+	if err != nil {
+		return nil, err
+	}
+
+	instances := make([]types.Instance, len(results))
+
+	for idx, rawEntry := range results {
+		rawMap := rawEntry.(map[string]interface{})
+		instance, err := loader(rawMap)
+		if err != nil {
+			return nil, err
+		}
+
+		instances[idx] = instance
+	}
+
+	return instances, nil
+}
+
 func (l *local) ListByType(ctx context.Context, id types.ID) ([]types.Instance, error) {
-	return nil, nil
+	if types.InheritsFrom(id, entity.ID) {
+		return l.listByStatement(ctx, G.V().Has(String("type"), String(id)))
+	} else if types.InheritsFrom(id, relation.ID) {
+		return l.listByStatement(ctx, G.E().Has(String("type"), String(id)))
+	}
+
+	return nil, fmt.Errorf("type '%s' isn't an entity or relation", id)
 }

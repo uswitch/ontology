@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/qasaur/gremgo"
+	"github.com/schwartzmx/gremtune"
 
 	"github.com/uswitch/ontology/pkg/store"
 	"github.com/uswitch/ontology/pkg/types"
@@ -17,7 +17,7 @@ import (
 const DATE_LAYOUT = "2006-01-02T15:04:05.000Z"
 
 type local struct {
-	client gremgo.Client
+	client gremtune.Client
 }
 
 func NewLocalServer(url string) (store.Store, error) {
@@ -27,8 +27,8 @@ func NewLocalServer(url string) (store.Store, error) {
 		log.Fatal("Lost connection to the database: " + err.Error())
 	}(errs) // Example of connection error handling logic
 
-	dialer := gremgo.NewDialer(url)     // Returns a WebSocket dialer to connect to Gremlin Server
-	g, err := gremgo.Dial(dialer, errs) // Returns a gremgo client to interact with
+	dialer := gremtune.NewDialer(url)     // Returns a WebSocket dialer to connect to Gremlin Server
+	g, err := gremtune.Dial(dialer, errs) // Returns a gremgo client to interact with
 	if err != nil {
 		return nil, err
 	}
@@ -38,31 +38,29 @@ func NewLocalServer(url string) (store.Store, error) {
 	}, err
 }
 
-func (l *local) execute(ctx context.Context, statement Statement) ([]interface{}, error) {
-	log.Println(statement.String())
+func (l *local) execute(ctx context.Context, statement Statement) ([]GenericValue, error) {
+	//log.Println(statement.String())
 
-	out, err := l.client.Execute(statement.String(), nil, nil)
-	//pretty.Println(out, err)
+	out, err := l.client.Execute(statement.String())
 	if err != nil {
 		return nil, err
 	}
 
-	results, ok := out.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("Failed to get results from data: %v", out)
-	}
-
-	//pretty.Println(results)
-
-	if values, ok := results[0].([]interface{}); ok {
-		return values, nil
-	} else if err, ok := results[0].(error); ok {
+	var listValue GenericValue
+	if err := json.Unmarshal(out[0].Result.Data, &listValue); err != nil {
 		return nil, err
-	} else if results[0] == nil {
-		return []interface{}{}, nil
-	} else {
-		return nil, fmt.Errorf("Failed to get values from result: %v", results[0])
 	}
+
+	if listValue.Type != "g:List" {
+		return nil, fmt.Errorf("expecting a list, got %s", listValue.Type)
+	}
+
+	items := []GenericValue{}
+	if err := json.Unmarshal(listValue.Value, &items); err != nil {
+		return nil, err
+	}
+
+	return items, nil
 }
 
 func (l *local) Add(ctx context.Context, instances ...types.Instance) error {
@@ -128,59 +126,36 @@ func (l *local) Add(ctx context.Context, instances ...types.Instance) error {
 	return nil
 }
 
-func propertiesLoader(rawProps map[string]interface{}) (map[string]interface{}, error) {
-	props := map[string]interface{}{}
+func loader(val GenericValue) (types.Instance, error) {
+	var rawSerialized json.RawMessage
 
-	for k, rawProp := range rawProps {
-		var vertexProp map[string]interface{}
+	switch val.Type {
+	case "g:Vertex":
+		var vertex VertexValue
 
-		switch typedProp := rawProp.(type) {
-		case []interface{}:
-			var ok bool
-
-			vertexProp, ok = typedProp[0].(map[string]interface{})
-			if !ok {
-				return nil, fmt.Errorf("Failed to cast vertex prop")
-			}
-		case map[string]interface{}:
-			vertexProp = typedProp
-		default:
-			return nil, fmt.Errorf("Failed to parse property, unknown type: %T!", rawProp)
+		if err := json.Unmarshal(val.Value, &vertex); err != nil {
+			log.Println(string(val.Value))
+			return nil, err
 		}
 
-		vpValue, ok := vertexProp["@value"].(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("Failed to cast vpCalue")
+		rawSerialized = vertex.Properties["_serialized"][0].Value.Value
+	case "g:Edge":
+		var edge EdgeValue
+
+		if err := json.Unmarshal(val.Value, &edge); err != nil {
+			return nil, err
 		}
 
-		props[k] = vpValue["value"]
+		rawSerialized = edge.Properties["_serialized"].Value.Value
+	default:
+		return nil, fmt.Errorf("unknown value type: %s", val.Type)
 	}
 
-	return props, nil
-}
+	var serialized string
 
-func loader(v map[string]interface{}) (types.Instance, error) {
-	values, ok := v["@value"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("Failed to get @value: %v", v["@value"])
-	}
-
-	rawProps, ok := values["properties"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to cast properties: %v", values["properties"])
-	}
-
-	props, err := propertiesLoader(rawProps)
-	if err != nil {
+	if err := json.Unmarshal(rawSerialized, &serialized); err != nil {
 		return nil, err
 	}
-
-	serialized, ok := props["_serialized"].(string)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast _serialized: %v", props["_serialized"])
-	}
-
-	//log.Println(serialized)
 
 	return types.Parse(serialized)
 }
@@ -196,12 +171,7 @@ func (l *local) getByStatement(ctx context.Context, st Statement) (types.Instanc
 		return nil, store.ErrNotFound
 	}
 
-	rawMap, ok := results[0].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("Failed to cast result")
-	}
-
-	return loader(rawMap)
+	return loader(results[0])
 }
 
 func (l *local) Get(ctx context.Context, id types.ID) (types.Instance, error) {
@@ -223,9 +193,8 @@ func (l *local) listByStatement(ctx context.Context, st Statement) ([]types.Inst
 
 	instances := make([]types.Instance, len(results))
 
-	for idx, rawEntry := range results {
-		rawMap := rawEntry.(map[string]interface{})
-		instance, err := loader(rawMap)
+	for idx, result := range results {
+		instance, err := loader(result)
 		if err != nil {
 			return nil, err
 		}

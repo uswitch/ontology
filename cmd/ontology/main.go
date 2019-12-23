@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	store, err := gremlin.NewLocalServer("ws://127.0.0.1:8182")
+	store, err := gremlin.NewLocalServer("ws://127.0.0.1:8182/gremlin")
 	if err != nil {
 		log.Fatalf("failed to connect to store: %v", err)
 	}

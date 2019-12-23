@@ -8,7 +8,7 @@ import (
 )
 
 func TestConformance(t *testing.T) {
-	s, err := NewLocalServer("ws://localhost:8182")
+	s, err := NewLocalServer("ws://127.0.0.1:8182/gremlin")
 	if err != nil {
 		t.Fatalf("failed to setup local connection: %v", err)
 	}
@@ -18,16 +18,12 @@ func TestConformance(t *testing.T) {
 
 		_, err := ls.client.Execute(
 			Graph().E().Drop().Iterate().String(),
-			map[string]string{},
-			map[string]string{},
 		)
 		if err != nil {
 			t.Fatalf("failed to drop all edges: %v", err)
 		}
 		_, err = ls.client.Execute(
 			Graph().V().Drop().Iterate().String(),
-			map[string]string{},
-			map[string]string{},
 		)
 		if err != nil {
 			t.Fatalf("failed to drop all vertices: %v", err)

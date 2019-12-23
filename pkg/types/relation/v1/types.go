@@ -5,13 +5,17 @@ import (
 	"github.com/uswitch/ontology/pkg/types/relation"
 )
 
-type IsTheSameAs relation.Relation
+type IsTheSameAs struct{ relation.Relation }
 
 func init() { types.RegisterType(IsTheSameAs{}, "/relation/v1/is_the_same_as", "/relation") }
 
-type IsPartOf relation.Relation
+type IsPartOf struct{ relation.Relation }
 
 func init() { types.RegisterType(IsPartOf{}, "/relation/v1/is_part_of", "/relation") }
+
+type IsClassifiedAs struct{ relation.Relation }
+
+func init() { types.RegisterType(IsClassifiedAs{}, "/relation/v1/is_classified_as", "/relation") }
 
 type WasBuiltBy struct {
 	relation.Relation

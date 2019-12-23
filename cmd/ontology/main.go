@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"log"
 	"os"
 
@@ -20,20 +21,25 @@ func main() {
 		log.Fatalf("failed to connect to store: %v", err)
 	}
 
+	instances := []types.Instance{}
+
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		in, err := types.Parse(scanner.Text())
 		if err != nil {
 			log.Printf("error parsing: %v", err)
+			continue
 		}
 
-		if err = store.Add(in); err != nil {
-			log.Printf("error adding: %v", err)
-		}
+		instances = append(instances, in)
 		//log.Printf("%T %+v", out, out)
 	}
 	if err := scanner.Err(); err != nil {
 		log.Printf("reading standard input: %v", err)
+	}
+
+	if err = store.Add(context.Background(), instances...); err != nil {
+		log.Printf("error adding: %v", err)
 	}
 
 	/*	out, err := Parse(`

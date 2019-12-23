@@ -25,27 +25,29 @@ type meta struct {
 var (
 	types    = map[string]reflect.Type{}
 	typeIDs  = map[reflect.Type]string{}
-	parents  = map[string]string{}
+	parent   = map[string]string{}
 	children = map[string][]string{}
 )
 
-func RegisterType(instance interface{}, id string, parent string) {
+func RegisterType(instance interface{}, id string, parentID string) {
 	typ := reflect.TypeOf(instance)
 	types[id] = typ
 	typeIDs[typ] = id
 
-	if parent != "" {
-		parents[id] = parent
-		if _, ok := children[parent]; !ok {
-			children[parent] = []string{}
+	if parentID != "" {
+		parent[id] = parentID
+		if _, ok := children[parentID]; !ok {
+			children[parentID] = []string{}
 		}
-		children[parent] = append(children[parent], id)
+		children[parentID] = append(children[parentID], id)
 	}
 }
 
 type Instance interface {
 	ID() ID
 	Type() ID
+	Name() string
+	UpdatedAt() time.Time
 }
 
 type Any struct {
@@ -53,13 +55,10 @@ type Any struct {
 	Properties struct{} `json:"properties"`
 }
 
-func (i *Any) ID() ID {
-	return i.Metadata.ID
-}
-
-func (i *Any) Type() ID {
-	return i.Metadata.Type
-}
+func (i *Any) ID() ID               { return i.Metadata.ID }
+func (i *Any) Type() ID             { return i.Metadata.Type }
+func (i *Any) Name() string         { return i.Metadata.Name }
+func (i *Any) UpdatedAt() time.Time { return i.Metadata.UpdatedAt }
 
 func init() { RegisterType(Any{}, "/any", "") }
 
@@ -89,4 +88,16 @@ func Parse(raw string) (Instance, error) {
 
 		return inst, nil
 	}
+}
+
+func IsA(inst Instance, id ID) bool {
+	idString := id.String()
+
+	for typeID := inst.Type().String(); typeID != ""; typeID = parent[typeID] {
+		if typeID == idString {
+			return true
+		}
+	}
+
+	return false
 }

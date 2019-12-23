@@ -12,16 +12,14 @@ type Instance interface {
 	B() types.ID
 }
 
-type RelationProperties struct {
+type Properties struct {
 	A types.ID `json:"a" ontology:"pointer,/entity"`
 	B types.ID `json:"b" ontology:"pointer,/entity"`
 }
 
 type Relation struct {
 	types.Any
-	Properties struct {
-		RelationProperties
-	} `json:"properties"`
+	Properties Properties `json:"properties"`
 }
 
 func (r *Relation) A() types.ID { return r.Properties.A }

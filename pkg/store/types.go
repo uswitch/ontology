@@ -2,8 +2,13 @@ package store
 
 import (
 	"context"
+	"errors"
 
 	"github.com/uswitch/ontology/pkg/types"
+)
+
+var (
+	ErrNotFound = errors.New("not found")
 )
 
 type Store interface {

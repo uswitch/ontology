@@ -20,7 +20,7 @@ func init() { types.RegisterType(IsClassifiedAs{}, "/relation/v1/is_classified_a
 type WasBuiltBy struct {
 	relation.Relation
 	Properties struct {
-		relation.RelationProperties
+		relation.Properties
 		Ref *string `json:"ref"`
 		At  string  `json:"at"`
 	} `json:"properties"`

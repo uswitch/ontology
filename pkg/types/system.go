@@ -18,31 +18,6 @@ type Metadata struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type meta struct {
-	Metadata `json:"metadata"`
-}
-
-var (
-	types    = map[string]reflect.Type{}
-	typeIDs  = map[reflect.Type]string{}
-	parent   = map[string]string{}
-	children = map[string][]string{}
-)
-
-func RegisterType(instance interface{}, id string, parentID string) {
-	typ := reflect.TypeOf(instance)
-	types[id] = typ
-	typeIDs[typ] = id
-
-	if parentID != "" {
-		parent[id] = parentID
-		if _, ok := children[parentID]; !ok {
-			children[parentID] = []string{}
-		}
-		children[parentID] = append(children[parentID], id)
-	}
-}
-
 type Instance interface {
 	ID() ID
 	Type() ID
@@ -62,8 +37,40 @@ func (i *Any) UpdatedAt() time.Time { return i.Metadata.UpdatedAt }
 
 func init() { RegisterType(Any{}, "/any", "") }
 
-func Parse(raw string) (Instance, error) {
-	var any meta
+type System struct {
+	types    map[string]reflect.Type
+	typeIDs  map[reflect.Type]string
+	parent   map[string]string
+	children map[string][]string
+}
+
+func NewSystem() *System {
+	return &System{
+		types:    map[string]reflect.Type{},
+		typeIDs:  map[reflect.Type]string{},
+		parent:   map[string]string{},
+		children: map[string][]string{},
+	}
+}
+
+func (s *System) RegisterType(instance interface{}, id string, parentID string) {
+	typ := reflect.TypeOf(instance)
+	s.types[id] = typ
+	s.typeIDs[typ] = id
+
+	if parentID != "" {
+		s.parent[id] = parentID
+		if _, ok := s.children[parentID]; !ok {
+			s.children[parentID] = []string{}
+		}
+		s.children[parentID] = append(s.children[parentID], id)
+	}
+}
+
+func (s *System) Parse(raw string) (Instance, error) {
+	var any struct {
+		Metadata `json:"metadata"`
+	}
 
 	if err := json.Unmarshal([]byte(raw), &any); err != nil {
 		return nil, err
@@ -71,7 +78,7 @@ func Parse(raw string) (Instance, error) {
 
 	typeID := any.Metadata.Type.String()
 
-	if typ, ok := types[typeID]; !ok {
+	if typ, ok := s.types[typeID]; !ok {
 		return nil, fmt.Errorf("unknown type: %s", typeID)
 	} else {
 		val := reflect.New(typ).Interface()
@@ -90,14 +97,38 @@ func Parse(raw string) (Instance, error) {
 	}
 }
 
-func IsA(inst Instance, id ID) bool {
+func (s *System) IsA(inst Instance, id ID) bool {
 	idString := id.String()
 
-	for typeID := inst.Type().String(); typeID != ""; typeID = parent[typeID] {
+	firstTypeID := inst.Type().String()
+
+	if firstTypeID == "" {
+		instType := reflect.TypeOf(inst)
+		if instType.Kind() == reflect.Ptr {
+			instType = instType.Elem()
+		}
+		firstTypeID = s.typeIDs[instType]
+	}
+
+	for typeID := firstTypeID; typeID != ""; typeID = s.parent[typeID] {
 		if typeID == idString {
 			return true
 		}
 	}
 
 	return false
+}
+
+var system = NewSystem()
+
+func RegisterType(instance interface{}, id string, parentID string) {
+	system.RegisterType(instance, id, parentID)
+}
+
+func Parse(raw string) (Instance, error) {
+	return system.Parse(raw)
+}
+
+func IsA(inst Instance, id ID) bool {
+	return system.IsA(inst, id)
 }

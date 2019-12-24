@@ -248,7 +248,7 @@ def eni_entity(resource)
           b: "/computer/aws/#{resource["accountId"]}/#{resource["awsRegion"]}/efs/#{fs_id}",
         },
       }
-    elsif interface_type == "interface" and (requester_id == "amazon-rds" or requester_id == "062191066759" or requester_id == "082811663747")
+    elsif interface_type == "interface" and (requester_id == "amazon-rds" or requester_id == "062191066759" or requester_id == "082811663747" or requester_id == "684743629997")
     # ignore RDS, relations built in rds_instance_entity
     elsif interface_type == "interface" and requester_id == "493711992759"
     # ignore DMS

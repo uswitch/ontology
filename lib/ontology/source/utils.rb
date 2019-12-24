@@ -44,14 +44,24 @@ def labels_to_relations(entitiy_id, updated_at, labels)
 
     type = tag[TAG_PREFIX.length..-1].gsub(/\./,"/")
 
-    {
-      metadata: {
-        type: type,
-      },
-      properties: {
-        a: entitiy_id,
-        b: val,
-      },
+    begin
+      vals = JSON.load(val)
+      raise "val should be an array: #{val}" if not vals.is_a? Array
+    rescue JSON::ParserError
+      vals = [val]
+    end
+
+    vals.map { |val|
+      {
+        metadata: {
+          type: type,
+          updated_at: updated_at,
+        },
+        properties: {
+          a: entitiy_id,
+          b: val,
+        },
+      }
     }
-   }.compact
+   }.flatten.compact
 end

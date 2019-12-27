@@ -231,41 +231,58 @@ func (l *local) listByStatement(ctx context.Context, st Statement) ([]types.Inst
 	return instances, nil
 }
 
-func (l *local) ListByType(ctx context.Context, id types.ID) ([]types.Instance, error) {
-	subclasses := types.SubclassesOf(id)
-	classStatements := make([]Statement, len(subclasses)+1)
+func (l *local) ListByType(ctx context.Context, id types.ID, options store.ListByTypeOptions) ([]types.Instance, error) {
+	typeStatement := String(id)
 
-	classStatements[0] = String(id)
+	if options.IncludeSubclasses {
+		subclasses := types.SubclassesOf(id)
+		classStatements := make([]Statement, len(subclasses)+1)
 
-	for idx, subclass := range subclasses {
-		classStatements[idx+1] = String(subclass)
+		classStatements[0] = String(id)
+
+		for idx, subclass := range subclasses {
+			classStatements[idx+1] = String(subclass)
+		}
+
+		typeStatement = Within(classStatements...)
 	}
 
 	if types.InheritsFrom(id, entity.ID) {
-		return l.listByStatement(ctx, G.V().Has(String("type"), Within(classStatements...)))
+		return l.listByStatement(ctx, G.V().Has(String("entity"), String("type"), typeStatement))
 	} else if types.InheritsFrom(id, relation.ID) {
-		return l.listByStatement(ctx, G.E().Has(String("type"), Within(classStatements...)))
+		return l.listByStatement(ctx, G.E().Has(String("type"), typeStatement))
 	}
 
 	return nil, fmt.Errorf("type '%s' isn't an entity or relation", id)
 }
 
-func (l *local) ListFromByType(ctx context.Context, rootID types.ID, typeID types.ID) ([]types.Instance, error) {
-	subclasses := types.SubclassesOf(typeID)
-	classStatements := make([]Statement, len(subclasses)+1)
+func (l *local) ListFromByType(ctx context.Context, rootID types.ID, typeID types.ID, options store.ListFromByTypeOptions) ([]types.Instance, error) {
+	typeStatement := String(typeID)
 
-	classStatements[0] = String(typeID)
+	if options.IncludeSubclasses {
+		subclasses := types.SubclassesOf(typeID)
+		classStatements := make([]Statement, len(subclasses)+1)
 
-	for idx, subclass := range subclasses {
-		classStatements[idx+1] = String(subclass)
+		classStatements[0] = String(typeID)
+
+		for idx, subclass := range subclasses {
+			classStatements[idx+1] = String(subclass)
+		}
+
+		typeStatement = Within(classStatements...)
+	}
+
+	maxDepth := 2
+	if options.MaxDepth > 0 {
+		maxDepth = options.MaxDepth
 	}
 
 	if types.InheritsFrom(typeID, entity.ID) {
 		return l.listByStatement(
 			ctx,
 			G.V().Has(String("id"), String(rootID)).
-				Repeat(Out()).Times(Int(2)).Emit().Dedup().
-				Has(String("type"), Within(classStatements...)),
+				Repeat(Out()).Times(Int(maxDepth)).Emit().Dedup().
+				Has(String("type"), typeStatement),
 		)
 	} else if types.InheritsFrom(typeID, relation.ID) {
 		return nil, nil

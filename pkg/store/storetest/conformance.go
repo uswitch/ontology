@@ -80,7 +80,7 @@ func TestList(t *testing.T, s store.Store) {
 		t.Fatalf("failed to add entity: %v", err)
 	}
 
-	if list, err := s.ListByType(context.Background(), entity.ID); err != nil {
+	if list, err := s.ListByType(context.Background(), entity.ID, store.ListByTypeOptions{IncludeSubclasses: true}); err != nil {
 		t.Errorf("failed to list entities: %v", err)
 	} else if list == nil {
 		t.Errorf("no entity list returned")
@@ -88,7 +88,7 @@ func TestList(t *testing.T, s store.Store) {
 		t.Errorf("entity list is the wrong size: %d != %d", len(list), expected)
 	}
 
-	if list, err := s.ListByType(context.Background(), relation.ID); err != nil {
+	if list, err := s.ListByType(context.Background(), relation.ID, store.ListByTypeOptions{IncludeSubclasses: true}); err != nil {
 		t.Errorf("failed to list relations: %v", err)
 	} else if list == nil {
 		t.Errorf("no relation list returned")
@@ -129,7 +129,7 @@ func TestListSubclasses(t *testing.T, s store.Store) {
 		t.Fatalf("failed to add entity: %v", err)
 	}
 
-	if list, err := s.ListByType(context.Background(), "/fruit"); err != nil {
+	if list, err := s.ListByType(context.Background(), "/fruit", store.ListByTypeOptions{IncludeSubclasses: true}); err != nil {
 		t.Errorf("failed to list entities: %v", err)
 	} else if list == nil {
 		t.Errorf("no entity list returned")
@@ -158,7 +158,12 @@ func TestListFromByType(t *testing.T, s store.Store) {
 		t.Fatalf("failed to add entity: %v", err)
 	}
 
-	if list, err := s.ListFromByType(context.Background(), "/horses/black-beauty", "/fruit"); err != nil {
+	if list, err := s.ListFromByType(
+		context.Background(), "/horses/black-beauty", "/fruit",
+		store.ListFromByTypeOptions{
+			ListByTypeOptions: store.ListByTypeOptions{IncludeSubclasses: true},
+			MaxDepth:          2,
+		}); err != nil {
 		t.Errorf("failed to list entities: %v", err)
 	} else if list == nil {
 		t.Errorf("no entity list returned")

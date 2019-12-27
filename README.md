@@ -191,3 +191,46 @@ the path of the property. In the above example, `thinginess` is a property of `/
 ## Output
 
 Mustache templates used as they do not limit us to Ruby, which is mostly a language to prototype this in.
+
+
+
+
+
+## JanusGraph (gremlin server)
+
+Here are some notes on how to run a local JanusGraph server for use when developing
+Ontology
+
+### Spinning up a server
+
+```
+$ mkdir -p var/janusgraph      # .gitignored
+$ docker run --rm --env-file etc/janusgraph/env.list -p 8182:8182 -v $(pwd)/var/janusgraph:/var/lib/janusgraph -v $(pwd)/etc/janusgraph:/etc/opt/janusgraph:ro --name janusgraph janusgraph/janusgraph:0.4
+```
+
+### Start Gremlin console
+
+```
+$ docker run --rm --link janusgraph:janusgraph -e GREMLIN_REMOTE_HOSTS=janusgraph -it janusgraph/janusgraph:0.4 ./bin/gremlin.sh
+```
+
+### Configure, enable and check status of Indicies
+
+```
+gremlin> :remote connect tinkerpop.server conf/remote.yaml
+
+
+gremlin> :> mgmt = graph.openManagement(); mgmt.buildIndex('vertexByID', Vertex.class).addKey(mgmt.getOrCreatePropertyKey('id')).buildCompositeIndex(); mgmt.commit()
+gremlin> :> mgmt = graph.openManagement(); mgmt.buildIndex('edgeByID', Edge.class).addKey(mgmt.getOrCreatePropertyKey('id')).buildCompositeIndex(); mgmt.commit()
+gremlin> :> mgmt = graph.openManagement(); mgmt.buildIndex('vertexByType', Vertex.class).addKey(mgmt.getOrCreatePropertyKey('type')).buildCompositeIndex(); mgmt.commit()
+gremlin> :> mgmt = graph.openManagement(); mgmt.buildIndex('edgeByType', Edge.class).addKey(mgmt.getOrCreatePropertyKey('type')).buildCompositeIndex(); mgmt.commit()
+
+gremlin> :> m = graph.openManagement(); index = m.getGraphIndex("edgeByID"); m.updateIndex(index, SchemaAction.ENABLE_INDEX).get(); m.commit()
+gremlin> :> m = graph.openManagement(); index = m.getGraphIndex("edgeByType"); m.updateIndex(index, SchemaAction.ENABLE_INDEX).get(); m.commit()
+
+
+gremlin> :> m = graph.openManagement(); index = m.getGraphIndex("byID"); pkey = index.getFieldKeys()[0]; index.getIndexStatus(pkey)
+gremlin> :> g.E().drop().iterate(); g.V().drop().iterate()
+gremlin> :> graph.getOpenTransactions()
+gremlin> :> graph.getOpenTransactions().getAt(0).rollback()
+```

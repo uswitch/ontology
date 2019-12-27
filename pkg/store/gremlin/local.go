@@ -27,8 +27,8 @@ func NewLocalServer(url string) (store.Store, error) {
 		log.Fatal("Lost connection to the database: " + err.Error())
 	}(errs) // Example of connection error handling logic
 
-	dialer := gremtune.NewDialer(url)     // Returns a WebSocket dialer to connect to Gremlin Server
-	g, err := gremtune.Dial(dialer, errs) // Returns a gremgo client to interact with
+	dialer := gremtune.NewDialer(url, gremtune.SetBufferSize(1_000_000, 1_000_000)) // Returns a WebSocket dialer to connect to Gremlin Server
+	g, err := gremtune.Dial(dialer, errs)                                           // Returns a gremgo client to interact with
 	if err != nil {
 		return nil, err
 	}
@@ -41,23 +41,49 @@ func NewLocalServer(url string) (store.Store, error) {
 func (l *local) execute(ctx context.Context, statement Statement) ([]GenericValue, error) {
 	//log.Println(statement.String())
 
-	out, err := l.client.Execute(statement.String())
-	if err != nil {
-		return nil, err
-	}
+	responseCh := make(chan gremtune.AsyncResponse, 10)
 
-	var listValue GenericValue
-	if err := json.Unmarshal(out[0].Result.Data, &listValue); err != nil {
+	if err := l.client.ExecuteAsync(statement.String(), responseCh); err != nil {
 		return nil, err
-	}
-
-	if listValue.Type != "g:List" {
-		return nil, fmt.Errorf("expecting a list, got %s", listValue.Type)
 	}
 
 	items := []GenericValue{}
-	if err := json.Unmarshal(listValue.Value, &items); err != nil {
-		return nil, err
+
+	for {
+		select {
+		case response, ok := <-responseCh:
+			if !ok {
+				return items, nil
+			}
+
+			if response.ErrorMessage != "" {
+				log.Printf("response.ErrorMessage: %v", response.ErrorMessage)
+			}
+
+			if response.Response.Status.Code == 204 {
+				log.Println("no results")
+				return items, nil
+			}
+
+			var listValue GenericValue
+			if err := json.Unmarshal(response.Response.Result.Data, &listValue); err != nil {
+				log.Printf("%+v", response)
+				return nil, fmt.Errorf("listValue unmarshal: %v", err)
+			}
+
+			if listValue.Type != "g:List" {
+				return nil, fmt.Errorf("expecting a list, got %s %v", listValue.Type, response)
+			}
+
+			responseItems := []GenericValue{}
+			if err := json.Unmarshal(listValue.Value, &responseItems); err != nil {
+				return nil, fmt.Errorf("responseItems unmarshal: %v", err)
+			}
+
+			items = append(items, responseItems...)
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
 	return items, nil

@@ -61,14 +61,12 @@ func (l *local) execute(ctx context.Context, statement Statement) ([]GenericValu
 			}
 
 			if response.Response.Status.Code == 204 {
-				log.Println("no results")
 				return items, nil
 			}
 
 			var listValue GenericValue
 			if err := json.Unmarshal(response.Response.Result.Data, &listValue); err != nil {
-				log.Printf("%+v", response)
-				return nil, fmt.Errorf("listValue unmarshal: %v", err)
+				return nil, fmt.Errorf("listValue unmarshal: %w", err)
 			}
 
 			if listValue.Type != "g:List" {
@@ -77,7 +75,7 @@ func (l *local) execute(ctx context.Context, statement Statement) ([]GenericValu
 
 			responseItems := []GenericValue{}
 			if err := json.Unmarshal(listValue.Value, &responseItems); err != nil {
-				return nil, fmt.Errorf("responseItems unmarshal: %v", err)
+				return nil, fmt.Errorf("responseItems unmarshal: %w", err)
 			}
 
 			items = append(items, responseItems...)
@@ -160,8 +158,7 @@ func loader(val GenericValue) (types.Instance, error) {
 		var vertex VertexValue
 
 		if err := json.Unmarshal(val.Value, &vertex); err != nil {
-			log.Println(string(val.Value))
-			return nil, err
+			return nil, fmt.Errorf("vertex value unmarshal: %w", err)
 		}
 
 		rawSerialized = vertex.Properties["_serialized"][0].Value.Value
@@ -169,7 +166,7 @@ func loader(val GenericValue) (types.Instance, error) {
 		var edge EdgeValue
 
 		if err := json.Unmarshal(val.Value, &edge); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("edge value unmarshal: %w", err)
 		}
 
 		rawSerialized = edge.Properties["_serialized"].Value.Value
@@ -180,10 +177,14 @@ func loader(val GenericValue) (types.Instance, error) {
 	var serialized string
 
 	if err := json.Unmarshal(rawSerialized, &serialized); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("serialied unmarshal: %w", err)
 	}
 
-	return types.Parse(serialized)
+	if parsed, err := types.Parse(serialized); err != nil {
+		return nil, fmt.Errorf("error parsing serialized form: %w", err)
+	} else {
+		return parsed, nil
+	}
 }
 
 func (l *local) getByStatement(ctx context.Context, st Statement) (types.Instance, error) {
@@ -222,7 +223,7 @@ func (l *local) listByStatement(ctx context.Context, st Statement) ([]types.Inst
 	for idx, result := range results {
 		instance, err := loader(result)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("instance loader error: %w", err)
 		}
 
 		instances[idx] = instance

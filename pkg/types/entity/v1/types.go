@@ -32,3 +32,7 @@ func init() { types.RegisterType(LoadBalancer{}, "/entity/v1/load_balancer", ent
 type IPV4Address struct{ entity.Entity }
 
 func init() { types.RegisterType(IPV4Address{}, "/entity/v1/ip_v4_address", entity.ID) }
+
+type Workload struct{ entity.Entity }
+
+func init() { types.RegisterType(Workload{}, "/entity/v1/workload", entity.ID) }

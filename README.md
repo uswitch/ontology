@@ -208,6 +208,14 @@ $ mkdir -p var/janusgraph      # .gitignored
 $ docker run --rm --env-file etc/janusgraph/env.list -p 8182:8182 -v $(pwd)/var/janusgraph:/var/lib/janusgraph -v $(pwd)/etc/janusgraph:/etc/opt/janusgraph:ro --name janusgraph janusgraph/janusgraph:0.4
 ```
 
+### Test server
+
+Different port and var directory
+
+```
+$ docker run --rm --env-file etc/janusgraph/env.list -p 8183:8182 -v $(pwd)/var/janusgraph-test:/var/lib/janusgraph -v $(pwd)/etc/janusgraph:/etc/opt/janusgraph:ro --name janusgraph-test janusgraph/janusgraph:0.4
+```
+
 ### Start Gremlin console
 
 ```

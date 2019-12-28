@@ -8,7 +8,7 @@ import (
 )
 
 func TestConformance(t *testing.T) {
-	s, err := NewLocalServer("ws://127.0.0.1:8182/gremlin")
+	s, err := NewLocalServer("ws://127.0.0.1:8183/gremlin")
 	if err != nil {
 		t.Fatalf("failed to setup local connection: %v", err)
 	}

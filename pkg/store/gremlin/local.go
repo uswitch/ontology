@@ -232,62 +232,127 @@ func (l *local) listByStatement(ctx context.Context, st Statement) ([]types.Inst
 	return instances, nil
 }
 
-func (l *local) ListByType(ctx context.Context, id types.ID, options store.ListByTypeOptions) ([]types.Instance, error) {
-	typeStatement := String(id)
+func expandTypes(typeList []types.ID) ([]types.ID, error) {
+	typeMap := map[types.ID]bool{}
 
-	if options.IncludeSubclasses {
-		subclasses := types.SubclassesOf(id)
-		classStatements := make([]Statement, len(subclasses)+1)
+	for _, typ := range typeList {
+		subclasses := types.SubclassesOf(typ)
 
-		classStatements[0] = String(id)
-
-		for idx, subclass := range subclasses {
-			classStatements[idx+1] = String(subclass)
+		typeMap[typ] = true
+		for _, subclass := range subclasses {
+			typeMap[subclass] = true
 		}
-
-		typeStatement = Within(classStatements...)
 	}
 
-	if types.InheritsFrom(id, entity.ID) {
+	firstIsAnEntity := types.InheritsFrom(typeList[0], entity.ID)
+
+	outList := make([]types.ID, len(typeMap))
+	idx := 0
+	for typ, _ := range typeMap {
+		if isAnEntity := types.InheritsFrom(typ, entity.ID); isAnEntity != firstIsAnEntity {
+			return nil, fmt.Errorf("all types need to be entity or relation types, cannot be mixed")
+		}
+
+		outList[idx] = typ
+		idx = idx + 1
+	}
+
+	return outList, nil
+}
+
+func typesToStatements(typeList []types.ID) []Statement {
+	out := make([]Statement, len(typeList))
+	for idx, typ := range typeList {
+		out[idx] = String(typ)
+	}
+	return out
+}
+
+func (l *local) ListByType(ctx context.Context, typeIDs []types.ID, options store.ListByTypeOptions) ([]types.Instance, error) {
+	var err error
+
+	if options.IncludeSubclasses {
+		if typeIDs, err = expandTypes(typeIDs); err != nil {
+			return nil, fmt.Errorf("failed to expand sub types: %w", err)
+		}
+	}
+
+	typeStatement := Within(typesToStatements(typeIDs)...)
+
+	if types.InheritsFrom(typeIDs[0], entity.ID) {
 		return l.listByStatement(ctx, G.V().Has(String("entity"), String("type"), typeStatement))
-	} else if types.InheritsFrom(id, relation.ID) {
+	} else if types.InheritsFrom(typeIDs[0], relation.ID) {
 		return l.listByStatement(ctx, G.E().Has(String("type"), typeStatement))
 	}
 
-	return nil, fmt.Errorf("type '%s' isn't an entity or relation", id)
+	return nil, fmt.Errorf("type '%s' isn't an entity or relation", typeIDs[0])
 }
 
-func (l *local) ListFromByType(ctx context.Context, rootID types.ID, typeID types.ID, options store.ListFromByTypeOptions) ([]types.Instance, error) {
-	typeStatement := String(typeID)
+func (l *local) ListFromByType(ctx context.Context, rootID types.ID, typeIDs []types.ID, options store.ListFromByTypeOptions) ([]types.Instance, error) {
+	var err error
 
 	if options.IncludeSubclasses {
-		subclasses := types.SubclassesOf(typeID)
-		classStatements := make([]Statement, len(subclasses)+1)
-
-		classStatements[0] = String(typeID)
-
-		for idx, subclass := range subclasses {
-			classStatements[idx+1] = String(subclass)
+		if typeIDs, err = expandTypes(typeIDs); err != nil {
+			return nil, fmt.Errorf("failed to expand sub types: %w", err)
 		}
-
-		typeStatement = Within(classStatements...)
 	}
+
+	typeStatement := Within(typesToStatements(typeIDs)...)
 
 	maxDepth := 2
 	if options.MaxDepth > 0 {
 		maxDepth = options.MaxDepth
 	}
 
-	if types.InheritsFrom(typeID, entity.ID) {
-		return l.listByStatement(
-			ctx,
-			G.V().Has(String("id"), String(rootID)).
-				Repeat(Out()).Times(Int(maxDepth)).Emit().Dedup().
-				Has(String("type"), typeStatement),
-		)
-	} else if types.InheritsFrom(typeID, relation.ID) {
-		return nil, nil
+	constraintPredicate := Without()
+
+	if numConstraints := len(options.ConstrainByType); numConstraints > 0 {
+		constraintTypes := map[types.ID]bool{}
+
+		for _, constraint := range options.ConstrainByType {
+			constraintTypes[constraint] = true
+
+			for _, subclass := range types.SubclassesOf(constraint) {
+				constraintTypes[subclass] = true
+			}
+		}
+
+		constraintStatements := []Statement{}
+
+		for typ, _ := range constraintTypes {
+			constraintStatements = append(constraintStatements, String(typ.String()))
+		}
+
+		constraintPredicate = Within(constraintStatements...)
 	}
 
-	return nil, fmt.Errorf("type '%s' isn't an entity or relation", typeID)
+	var repeatStatement Statement
+
+	switch options.Direction {
+	case store.OutTraverseDirection:
+		repeatStatement = OutE().Has(String("type"), constraintPredicate).As("edge").
+			InV().Has(String("type"), constraintPredicate).As("vertex")
+	case store.InTraverseDirection:
+		repeatStatement = InE().Has(String("type"), constraintPredicate).As("edge").
+			OutV().Has(String("type"), constraintPredicate).As("vertex")
+	default:
+		return nil, fmt.Errorf("unknown traverse direction: %v", options.Direction)
+	}
+
+	var selectType string
+
+	if types.InheritsFrom(typeIDs[0], entity.ID) {
+		selectType = "vertex"
+	} else if types.InheritsFrom(typeIDs[0], relation.ID) {
+		selectType = "edge"
+	} else {
+		return nil, fmt.Errorf("type '%s' isn't an entity or relation", typeIDs[0])
+	}
+
+	return l.listByStatement(
+		ctx,
+		G.V().Has(String("id"), String(rootID)).
+			Repeat(repeatStatement).Times(Int(maxDepth)).Emit().Select(selectType).Dedup().
+			Has(String("type"), typeStatement),
+	)
 }

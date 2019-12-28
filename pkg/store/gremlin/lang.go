@@ -119,9 +119,9 @@ func BothE(label string) Statement {
 		parts: []string{fmt.Sprintf("bothE('%s')", label)},
 	}
 }
-func InE(label Statement) Statement {
+func InE(ss ...Statement) Statement {
 	return Statement{
-		parts: []string{fmt.Sprintf("inE(%s)", label.String())},
+		parts: []string{funcCall("inE", ss)},
 	}
 }
 func (s Statement) InE(label Statement) Statement {
@@ -160,6 +160,12 @@ func (s Statement) Select(vals ...string) Statement {
 func Within(ss ...Statement) Statement {
 	return Statement{
 		parts: []string{funcCall("within", ss)},
+	}
+}
+
+func Without(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("without", ss)},
 	}
 }
 
@@ -483,6 +489,12 @@ func Range(ss ...Statement) Statement {
 func Out(ss ...Statement) Statement {
 	return Statement{
 		parts: []string{funcCall("out", ss)},
+	}
+}
+
+func In(ss ...Statement) Statement {
+	return Statement{
+		parts: []string{funcCall("in", ss)},
 	}
 }
 

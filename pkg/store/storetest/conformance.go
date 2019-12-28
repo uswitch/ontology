@@ -12,10 +12,13 @@ import (
 
 func Conformance(t *testing.T, newStore func() store.Store) {
 	tests := map[string]func(*testing.T, store.Store){
-		"AddAndGet":      TestAddAndGet,
+		"AddAndGet": TestAddAndGet,
+
 		"List":           TestList,
 		"ListSubclasses": TestListSubclasses,
-		"ListFromByType": TestListFromByType,
+
+		"ListFromByType":          TestListFromByType,
+		"ListFromByTypeRelations": TestListFromByTypeRelations,
 	}
 
 	for name, test := range tests {
@@ -80,7 +83,7 @@ func TestList(t *testing.T, s store.Store) {
 		t.Fatalf("failed to add entity: %v", err)
 	}
 
-	if list, err := s.ListByType(context.Background(), entity.ID, store.ListByTypeOptions{IncludeSubclasses: true}); err != nil {
+	if list, err := s.ListByType(context.Background(), []types.ID{entity.ID}, store.ListByTypeOptions{IncludeSubclasses: true}); err != nil {
 		t.Errorf("failed to list entities: %v", err)
 	} else if list == nil {
 		t.Errorf("no entity list returned")
@@ -88,7 +91,7 @@ func TestList(t *testing.T, s store.Store) {
 		t.Errorf("entity list is the wrong size: %d != %d", len(list), expected)
 	}
 
-	if list, err := s.ListByType(context.Background(), relation.ID, store.ListByTypeOptions{IncludeSubclasses: true}); err != nil {
+	if list, err := s.ListByType(context.Background(), []types.ID{relation.ID}, store.ListByTypeOptions{IncludeSubclasses: true}); err != nil {
 		t.Errorf("failed to list relations: %v", err)
 	} else if list == nil {
 		t.Errorf("no relation list returned")
@@ -129,7 +132,7 @@ func TestListSubclasses(t *testing.T, s store.Store) {
 		t.Fatalf("failed to add entity: %v", err)
 	}
 
-	if list, err := s.ListByType(context.Background(), "/fruit", store.ListByTypeOptions{IncludeSubclasses: true}); err != nil {
+	if list, err := s.ListByType(context.Background(), []types.ID{"/fruit"}, store.ListByTypeOptions{IncludeSubclasses: true}); err != nil {
 		t.Errorf("failed to list entities: %v", err)
 	} else if list == nil {
 		t.Errorf("no entity list returned")
@@ -159,7 +162,7 @@ func TestListFromByType(t *testing.T, s store.Store) {
 	}
 
 	if list, err := s.ListFromByType(
-		context.Background(), "/horses/black-beauty", "/fruit",
+		context.Background(), "/horses/black-beauty", []types.ID{"/fruit"},
 		store.ListFromByTypeOptions{
 			ListByTypeOptions: store.ListByTypeOptions{IncludeSubclasses: true},
 			MaxDepth:          2,
@@ -169,6 +172,46 @@ func TestListFromByType(t *testing.T, s store.Store) {
 		t.Errorf("no entity list returned")
 	} else if expected := 1; len(list) != expected {
 		t.Errorf("entity list is the wrong size: %d != %d", len(list), expected)
+	}
+
+}
+
+func TestListFromByTypeRelations(t *testing.T, s store.Store) {
+	if err := s.Add(
+		context.Background(),
+		&entity.Entity{
+			types.Any{Metadata: types.Metadata{ID: "/horses/black-beauty", Type: "/horse"}},
+		},
+		&entity.Entity{
+			types.Any{Metadata: types.Metadata{ID: "/apples/braeburn", Type: "/fruit/apple"}},
+		},
+		&LikesToEat{
+			relation.Relation{
+				types.Any{Metadata: types.Metadata{ID: "/l8hreliueanbr", Type: "/relation/likes-to-eat"}},
+				relation.Properties{A: "/horses/black-beauty", B: "/apples/braeburn"},
+			},
+		},
+		&LikesToEat{
+			relation.Relation{
+				types.Any{Metadata: types.Metadata{ID: "/iurgliuh", Type: "/relation/likes-to-eat"}},
+				relation.Properties{A: "/horses/alf", B: "/apples/braeburn"},
+			},
+		},
+	); err != nil {
+		t.Fatalf("failed to add entity: %v", err)
+	}
+
+	if list, err := s.ListFromByType(
+		context.Background(), "/horses/black-beauty", []types.ID{relation.ID},
+		store.ListFromByTypeOptions{
+			ListByTypeOptions: store.ListByTypeOptions{IncludeSubclasses: true},
+			MaxDepth:          2,
+		}); err != nil {
+		t.Errorf("failed to list relations: %v", err)
+	} else if list == nil {
+		t.Errorf("no relation list returned")
+	} else if expected := 1; len(list) != expected {
+		t.Errorf("relation list is the wrong size: %d != %d", len(list), expected)
 	}
 
 }

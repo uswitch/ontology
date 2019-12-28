@@ -2,7 +2,7 @@ require 'k8s-client'
 require 'uri'
 
 require_relative './docker.rb'
-5
+
 def owner_relations(id, updated_at, server, metadata)
   if metadata.ownerReferences and metadata.ownerReferences.count > 0
     metadata.ownerReferences.map { |ref|
@@ -20,6 +20,32 @@ def owner_relations(id, updated_at, server, metadata)
     []
 
   end
+end
+
+def label_schema_relations(id, updated_at, annotations)
+  out = []
+
+  if annotations.has_key?(:"org.label-schema.vcs-url")
+    vcs_uri = URI(annotations[:"org.label-schema.vcs-url"])
+
+    without_ext = File.join(File.dirname(vcs_uri.path), File.basename(vcs_uri.path, ".*"))
+
+    out << {
+      metadata: {
+        type: "/relation/v1/was_deployed_by",
+        updated_at: updated_at,
+      },
+      properties: {
+        a: id,
+        b: "/repository/#{vcs_uri.host}#{without_ext}",
+        ref: annotations[:"org.label-schema.vcs-ref"],
+        at: annotations[:"org.label-schema.build-date"],
+        url: annotations[:"org.label-schema.url"],
+      }
+    }
+  end
+
+  out
 end
 
 def image_relations(id, updated_at, containers)
@@ -91,7 +117,8 @@ module Ontology
 
           relations = (
             owner_relations(id, updated_at, server, cronjob.metadata) +
-            labels_to_relations(id, updated_at, cronjob.metadata.annotations.to_h)
+            labels_to_relations(id, updated_at, cronjob.metadata.annotations.to_h) +
+            label_schema_relations(id, updated_at, cronjob.metadata.annotations.to_h)
           )
 
           [
@@ -113,7 +140,8 @@ module Ontology
 
           relations = (
             owner_relations(id, updated_at, server, job.metadata) +
-            labels_to_relations(id, updated_at, job.metadata.annotations.to_h)
+            labels_to_relations(id, updated_at, job.metadata.annotations.to_h) +
+            label_schema_relations(id, updated_at, job.metadata.annotations.to_h)
           )
 
           [
@@ -131,11 +159,13 @@ module Ontology
 
         deployments = client.api('apps/v1').resource('deployments').list.map do |deployment|
           id = "/workload/kubernetes/#{server}/#{deployment.metadata.namespace}/deployment/#{deployment.metadata.name}"
+
           updated_at = DateTime.now.rfc3339
 
           relations = (
             owner_relations(id, updated_at, server, deployment.metadata) +
-            labels_to_relations(id, updated_at, deployment.metadata.annotations.to_h)
+            labels_to_relations(id, updated_at, deployment.metadata.annotations.to_h) +
+            label_schema_relations(id, updated_at, deployment.metadata.annotations.to_h)
           )
 
           [
@@ -157,7 +187,8 @@ module Ontology
 
           relations = (
             owner_relations(id, updated_at, server, replica_set.metadata) +
-            labels_to_relations(id, updated_at, replica_set.metadata.annotations.to_h)
+            labels_to_relations(id, updated_at, replica_set.metadata.annotations.to_h) +
+            label_schema_relations(id, updated_at, replica_set.metadata.annotations.to_h)
           )
 
           [
@@ -179,7 +210,8 @@ module Ontology
 
           relations = (
             owner_relations(id, updated_at, server, daemon_set.metadata) +
-            labels_to_relations(id, updated_at, daemon_set.metadata.annotations.to_h)
+            labels_to_relations(id, updated_at, daemon_set.metadata.annotations.to_h) +
+            label_schema_relations(id, updated_at, daemon_set.metadata.annotations.to_h)
           )
 
           [
@@ -213,7 +245,8 @@ module Ontology
           ] + (
             image_relations(id, updated_at, pod.spec.containers) +
             owner_relations(id, updated_at, server, pod.metadata) +
-            labels_to_relations(id, updated_at, pod.metadata.annotations.to_h)
+            labels_to_relations(id, updated_at, pod.metadata.annotations.to_h) +
+            label_schema_relations(id, updated_at, pod.metadata.annotations.to_h)
           )
 
           [
